@@ -15,6 +15,12 @@ const quickLinks = [
       "Book visits, manage calendar scheduling, reminders, statuses, and follow-ups.",
     href: "/appointments",
   },
+  {
+    title: "Dental Records / EMR",
+    description:
+      "Capture odontogram findings, diagnoses, treatment plans, procedures, and clinical attachments.",
+    href: "/emr",
+  },
 ];
 
 export default function Home() {

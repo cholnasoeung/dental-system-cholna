@@ -11,7 +11,7 @@ const menuSections = [
       { label: "Dashboard Overview", href: "/" },
       { label: "Patient Management", href: "/patients" },
       { label: "Appointment Management", href: "/appointments" },
-      { label: "Dental Records / EMR", href: "#" },
+      { label: "Dental Records / EMR", href: "/emr" },
       { label: "Billing & Payments", href: "#" },
     ],
   },

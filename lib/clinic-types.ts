@@ -63,6 +63,46 @@ export type AppointmentFormState = {
   notes: string;
 };
 
+export type ToothCondition =
+  | "healthy"
+  | "caries"
+  | "filling"
+  | "crown"
+  | "missing"
+  | "implant"
+  | "root-canal";
+
+export type OdontogramTooth = {
+  toothNumber: string;
+  condition: ToothCondition;
+  notes: string;
+};
+
+export type ClinicalAttachment = {
+  name: string;
+  size: number;
+  category: "xray" | "scan" | "report";
+};
+
+export type DentalRecord = {
+  id: string;
+  patientId: string;
+  patientName: string;
+  visitDate: string;
+  chiefComplaint: string;
+  consultationNotes: string;
+  diagnoses: string;
+  treatmentPlan: string;
+  procedureHistory: string;
+  clinicalAttachments: ClinicalAttachment[];
+  odontogram: OdontogramTooth[];
+};
+
+export type DentalRecordFormState = Omit<
+  DentalRecord,
+  "id" | "patientName" | "clinicalAttachments" | "odontogram"
+>;
+
 export const dentists = ["Dr. Lina", "Dr. Sreypov", "Dr. Dara", "Dr. Michael"];
 
 export const statusOptions: AppointmentStatus[] = [
@@ -110,4 +150,59 @@ export const initialAppointmentForm: AppointmentFormState = {
   reminderChannel: "sms",
   followUpDate: "",
   notes: "",
+};
+
+export const odontogramToothNumbers = [
+  "18",
+  "17",
+  "16",
+  "15",
+  "14",
+  "13",
+  "12",
+  "11",
+  "21",
+  "22",
+  "23",
+  "24",
+  "25",
+  "26",
+  "27",
+  "28",
+  "48",
+  "47",
+  "46",
+  "45",
+  "44",
+  "43",
+  "42",
+  "41",
+  "31",
+  "32",
+  "33",
+  "34",
+  "35",
+  "36",
+  "37",
+  "38",
+];
+
+export const toothConditionOptions: ToothCondition[] = [
+  "healthy",
+  "caries",
+  "filling",
+  "crown",
+  "missing",
+  "implant",
+  "root-canal",
+];
+
+export const initialDentalRecordForm: DentalRecordFormState = {
+  patientId: "",
+  visitDate: "",
+  chiefComplaint: "",
+  consultationNotes: "",
+  diagnoses: "",
+  treatmentPlan: "",
+  procedureHistory: "",
 };
