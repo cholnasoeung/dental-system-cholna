@@ -12,7 +12,209 @@ import {
   type DentalRecordFormState,
   type OdontogramTooth,
   type PatientProfile,
+  type ToothCondition,
 } from "@/lib/clinic-types";
+
+const upperLeftTeeth = ["18", "17", "16", "15", "14", "13", "12", "11"];
+const upperRightTeeth = ["21", "22", "23", "24", "25", "26", "27", "28"];
+const lowerLeftTeeth = ["48", "47", "46", "45", "44", "43", "42", "41"];
+const lowerRightTeeth = ["31", "32", "33", "34", "35", "36", "37", "38"];
+
+function getToothType(toothNumber: string) {
+  const position = Number(toothNumber.slice(1));
+
+  if (position === 1 || position === 2) {
+    return "incisor";
+  }
+
+  if (position === 3) {
+    return "canine";
+  }
+
+  if (position === 4 || position === 5) {
+    return "premolar";
+  }
+
+  return "molar";
+}
+
+function getConditionBadge(condition: ToothCondition) {
+  switch (condition) {
+    case "healthy":
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    case "caries":
+      return "border-rose-200 bg-rose-50 text-rose-700";
+    case "filling":
+      return "border-sky-200 bg-sky-50 text-sky-700";
+    case "crown":
+      return "border-amber-200 bg-amber-50 text-amber-700";
+    case "missing":
+      return "border-slate-300 bg-slate-100 text-slate-700";
+    case "implant":
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    case "root-canal":
+      return "border-violet-200 bg-violet-50 text-violet-700";
+    default:
+      return "border-slate-200 bg-slate-50 text-slate-600";
+  }
+}
+
+function ToothIllustration({
+  toothNumber,
+  condition,
+  isSelected,
+  isLower,
+}: {
+  toothNumber: string;
+  condition: ToothCondition;
+  isSelected: boolean;
+  isLower: boolean;
+}) {
+  const toothType = getToothType(toothNumber);
+  const outlineClass = isSelected
+    ? "text-sky-600"
+    : condition === "healthy"
+      ? "text-slate-500"
+      : condition === "caries"
+        ? "text-rose-500"
+        : condition === "filling"
+          ? "text-sky-500"
+          : condition === "crown"
+            ? "text-amber-500"
+            : condition === "implant"
+              ? "text-emerald-500"
+              : condition === "root-canal"
+                ? "text-violet-500"
+                : "text-slate-400";
+
+  return (
+    <div className="relative flex h-28 items-center justify-center">
+      <svg
+        viewBox="0 0 60 104"
+        className={`h-24 w-14 ${outlineClass} ${isLower ? "rotate-180" : ""}`}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        {toothType === "molar" ? (
+          <path d="M12 23C14 12 19 8 24 8c3 0 5 2 6 5 1-3 3-5 6-5 5 0 10 4 12 15 3 18 1 31-4 39-4 7-5 15-6 29H24c-1-14-2-22-6-29-5-8-7-21-6-39Z" />
+        ) : null}
+        {toothType === "premolar" ? (
+          <path d="M18 18c2-8 6-12 12-12s10 4 12 12c4 17 3 32-2 41-5 9-7 18-8 32h-4c-1-14-3-23-8-32-5-9-6-24-2-41Z" />
+        ) : null}
+        {toothType === "canine" ? (
+          <path d="M24 11c2-5 4-7 6-7s4 2 6 7c5 16 5 35 1 47-4 13-6 22-7 33h-2c-1-11-3-20-7-33-4-12-4-31 1-47Z" />
+        ) : null}
+        {toothType === "incisor" ? (
+          <path d="M21 10c2-4 5-6 9-6s7 2 9 6c3 10 4 27 1 43-3 14-5 24-6 38h-8c-1-14-3-24-6-38-3-16-2-33 1-43Z" />
+        ) : null}
+
+        {condition === "filling" ? (
+          <path d="M21 29h18M20 36h20" className="text-sky-500" />
+        ) : null}
+        {condition === "crown" ? (
+          <path d="M17 20c4 4 8 6 13 6s9-2 13-6" className="text-amber-500" />
+        ) : null}
+        {condition === "root-canal" ? (
+          <path d="M30 28v44" className="text-violet-500" />
+        ) : null}
+        {condition === "caries" ? (
+          <circle cx="30" cy="35" r="5" className="fill-rose-500 stroke-rose-500" />
+        ) : null}
+      </svg>
+
+      {condition === "missing" ? (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <svg viewBox="0 0 100 100" className="h-24 w-14 text-rose-600">
+            <path
+              d="M18 14 82 86M82 14 18 86"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+            />
+          </svg>
+        </div>
+      ) : null}
+
+      {condition === "implant" ? (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <svg viewBox="0 0 100 100" className="h-24 w-14 text-emerald-500">
+            <path
+              d="M28 16 72 84M72 16 28 84"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+            />
+          </svg>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function OdontogramRow({
+  title,
+  teeth,
+  isLower = false,
+  selectedToothNumber,
+  toothLookup,
+  onSelectTooth,
+}: {
+  title: string;
+  teeth: string[];
+  isLower?: boolean;
+  selectedToothNumber: string;
+  toothLookup: Map<string, OdontogramTooth>;
+  onSelectTooth: (toothNumber: string) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+          {title}
+        </p>
+        <div className="h-px flex-1 bg-slate-200 ml-4" />
+      </div>
+      <div className="grid grid-cols-4 gap-2 md:grid-cols-8 xl:gap-3">
+        {teeth.map((toothNumber) => {
+          const tooth = toothLookup.get(toothNumber);
+
+          if (!tooth) {
+            return null;
+          }
+
+          const isSelected = toothNumber === selectedToothNumber;
+
+          return (
+            <button
+              key={toothNumber}
+              type="button"
+              onClick={() => onSelectTooth(toothNumber)}
+              className={`rounded-[22px] border px-1.5 py-2 transition md:rounded-[26px] md:px-2 md:py-3 ${
+                isSelected
+                  ? "border-sky-300 bg-sky-50 shadow-[0_14px_30px_rgba(14,165,233,0.14)]"
+                  : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+              }`}
+            >
+              <ToothIllustration
+                toothNumber={toothNumber}
+                condition={tooth.condition}
+                isSelected={isSelected}
+                isLower={isLower}
+              />
+              <p className="mt-1 text-center text-sm font-semibold text-slate-900 md:text-base">
+                {toothNumber}
+              </p>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function formatDateLabel(date: string) {
   if (!date) {
@@ -51,6 +253,7 @@ export default function EmrPage() {
       notes: "",
     })),
   );
+  const [selectedToothNumber, setSelectedToothNumber] = useState("11");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -172,10 +375,15 @@ export default function EmrPage() {
     0,
   );
   const totalProcedures = records.filter((record) => record.procedureHistory).length;
+  const toothLookup = new Map(
+    odontogram.map((tooth) => [tooth.toothNumber, tooth] as const),
+  );
+  const selectedTooth =
+    toothLookup.get(selectedToothNumber) ?? toothLookup.get("11") ?? odontogram[0];
 
   return (
     <AdminShell>
-      <div className="mx-auto max-w-6xl space-y-6">
+      <div className="mx-auto max-w-[1180px] space-y-6">
         <header className="rounded-[28px] border border-white/80 bg-white/80 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
           <p className="text-xs font-semibold uppercase tracking-[0.35em] text-sky-700">
             Module C
@@ -230,7 +438,7 @@ export default function EmrPage() {
           </div>
         ) : null}
 
-        <div className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
+        <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.2fr)_360px]">
           <section className="rounded-[28px] border border-white/80 bg-white/85 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
             <h3 className="text-xl font-semibold text-slate-950">Create EMR Entry</h3>
 
@@ -333,49 +541,145 @@ export default function EmrPage() {
                     Tooth Chart / Odontogram
                   </h4>
                   <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700">
-                    32 teeth
+                    Standard permanent chart
                   </span>
                 </div>
-                <div className="mt-4 grid gap-3 sm:grid-cols-4 lg:grid-cols-8">
-                  {odontogram.map((tooth) => (
-                    <div
-                      key={tooth.toothNumber}
-                      className="rounded-2xl border border-slate-200 bg-slate-50 p-3"
-                    >
-                      <p className="text-sm font-semibold text-slate-900">
-                        {tooth.toothNumber}
-                      </p>
-                      <select
-                        value={tooth.condition}
-                        onChange={(event) =>
-                          handleToothChange(
-                            tooth.toothNumber,
-                            "condition",
-                            event.target.value,
-                          )
-                        }
-                        className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs outline-none"
-                      >
-                        {toothConditionOptions.map((condition) => (
-                          <option key={condition} value={condition}>
-                            {condition}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        value={tooth.notes}
-                        onChange={(event) =>
-                          handleToothChange(
-                            tooth.toothNumber,
-                            "notes",
-                            event.target.value,
-                          )
-                        }
-                        placeholder="Note"
-                        className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs outline-none"
+                <div className="mt-3 rounded-[30px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-4 shadow-inner shadow-sky-50/60 md:p-5">
+                  <div className="space-y-5">
+                    <div className="space-y-5 rounded-[26px] border border-slate-200/80 bg-white/80 p-4 md:p-5">
+                      <OdontogramRow
+                        title="Upper Right"
+                        teeth={upperLeftTeeth}
+                        selectedToothNumber={selectedToothNumber}
+                        toothLookup={toothLookup}
+                        onSelectTooth={setSelectedToothNumber}
+                      />
+                      <OdontogramRow
+                        title="Upper Left"
+                        teeth={upperRightTeeth}
+                        selectedToothNumber={selectedToothNumber}
+                        toothLookup={toothLookup}
+                        onSelectTooth={setSelectedToothNumber}
+                      />
+                      <div className="h-px bg-slate-200" />
+                      <OdontogramRow
+                        title="Lower Right"
+                        teeth={lowerLeftTeeth}
+                        isLower
+                        selectedToothNumber={selectedToothNumber}
+                        toothLookup={toothLookup}
+                        onSelectTooth={setSelectedToothNumber}
+                      />
+                      <OdontogramRow
+                        title="Lower Left"
+                        teeth={lowerRightTeeth}
+                        isLower
+                        selectedToothNumber={selectedToothNumber}
+                        toothLookup={toothLookup}
+                        onSelectTooth={setSelectedToothNumber}
                       />
                     </div>
-                  ))}
+
+                    <div className="grid gap-4 xl:grid-cols-[200px_minmax(0,1fr)]">
+                      <div className="rounded-[26px] border border-slate-200 bg-white p-4 shadow-[0_18px_34px_rgba(15,23,42,0.06)]">
+                        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+                          Selected Tooth
+                        </p>
+                        <div className="mt-3 flex items-start justify-between gap-3 xl:block">
+                          <div>
+                            <h5 className="text-3xl font-semibold text-slate-950">
+                              {selectedTooth.toothNumber}
+                            </h5>
+                            <p className="mt-1 text-sm text-slate-500">
+                              Update findings for the active tooth.
+                            </p>
+                          </div>
+                          <span
+                            className={`rounded-full border px-3 py-1 text-xs font-semibold capitalize ${getConditionBadge(
+                              selectedTooth.condition,
+                            )}`}
+                          >
+                            {selectedTooth.condition.replace("-", " ")}
+                          </span>
+                        </div>
+
+                        <div className="mt-4 rounded-3xl bg-slate-50 p-4">
+                          <ToothIllustration
+                            toothNumber={selectedTooth.toothNumber}
+                            condition={selectedTooth.condition}
+                            isSelected
+                            isLower={
+                              lowerLeftTeeth.includes(selectedTooth.toothNumber) ||
+                              lowerRightTeeth.includes(selectedTooth.toothNumber)
+                            }
+                          />
+                        </div>
+                      </div>
+
+                      <div className="rounded-[26px] border border-slate-200 bg-white p-4 shadow-[0_18px_34px_rgba(15,23,42,0.06)]">
+                        <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
+                          <label className="space-y-1">
+                            <span className="text-sm font-medium text-slate-700">
+                              Condition
+                            </span>
+                            <select
+                              value={selectedTooth.condition}
+                              onChange={(event) =>
+                                handleToothChange(
+                                  selectedTooth.toothNumber,
+                                  "condition",
+                                  event.target.value,
+                                )
+                              }
+                              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white"
+                            >
+                              {toothConditionOptions.map((condition) => (
+                                <option key={condition} value={condition}>
+                                  {condition.replace("-", " ")}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+
+                          <label className="space-y-1">
+                            <span className="text-sm font-medium text-slate-700">
+                              Clinical Note
+                            </span>
+                            <textarea
+                              value={selectedTooth.notes}
+                              onChange={(event) =>
+                                handleToothChange(
+                                  selectedTooth.toothNumber,
+                                  "notes",
+                                  event.target.value,
+                                )
+                              }
+                              placeholder="Mobility, percussion pain, fracture line, restoration margin..."
+                              className="min-h-28 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white"
+                            />
+                          </label>
+                        </div>
+
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+                            Healthy
+                          </span>
+                          <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-medium text-rose-700">
+                            Caries / Missing
+                          </span>
+                          <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700">
+                            Filling
+                          </span>
+                          <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
+                            Crown
+                          </span>
+                          <span className="rounded-full bg-violet-50 px-3 py-1 text-xs font-medium text-violet-700">
+                            Root canal
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 

@@ -43,8 +43,8 @@ export function AdminShell({ children }: AdminShellProps) {
 
   return (
     <div className="min-h-screen bg-[linear-gradient(135deg,#f3fafc_0%,#e7f2ff_45%,#f9fbff_100%)] p-4 md:p-6">
-      <main className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-7xl overflow-hidden rounded-[28px] border border-white/70 bg-white/75 shadow-[0_30px_80px_rgba(15,23,42,0.10)] backdrop-blur md:min-h-[calc(100vh-3rem)]">
-        <aside className="flex w-full max-w-sm flex-col justify-between bg-[linear-gradient(180deg,#0f172a_0%,#102033_45%,#16324a_100%)] p-6 text-white md:p-8">
+      <main className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-[1500px] overflow-hidden rounded-[28px] border border-white/70 bg-white/75 shadow-[0_30px_80px_rgba(15,23,42,0.10)] backdrop-blur md:min-h-[calc(100vh-3rem)]">
+        <aside className="hidden w-[290px] shrink-0 flex-col justify-between bg-[linear-gradient(180deg,#0f172a_0%,#102033_45%,#16324a_100%)] p-6 text-white lg:flex xl:w-[310px] xl:p-8">
           <div>
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-400/20 text-lg font-bold text-cyan-200 ring-1 ring-white/10">
@@ -92,22 +92,10 @@ export function AdminShell({ children }: AdminShellProps) {
                       return item.href === "#" ? (
                         <div key={item.label} className={className}>
                           <span>{item.label}</span>
-                          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/8 text-xs text-slate-300">
-                            {index + 1}
-                          </span>
                         </div>
                       ) : (
                         <Link key={item.label} href={item.href} className={className}>
                           <span>{item.label}</span>
-                          <span
-                            className={`flex h-7 w-7 items-center justify-center rounded-full text-xs ${
-                              isActive
-                                ? "bg-slate-950/10 text-slate-900"
-                                : "bg-white/8 text-slate-300"
-                            }`}
-                          >
-                            {index + 1}
-                          </span>
                         </Link>
                       );
                     })}
@@ -133,7 +121,7 @@ export function AdminShell({ children }: AdminShellProps) {
           </div>
         </aside>
 
-        <section className="flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.10),transparent_22%),linear-gradient(180deg,#f9fdff_0%,#eef6ff_100%)] p-5 md:p-8">
+        <section className="flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.10),transparent_22%),linear-gradient(180deg,#f9fdff_0%,#eef6ff_100%)] p-4 md:p-6 xl:p-8">
           {children}
         </section>
       </main>
