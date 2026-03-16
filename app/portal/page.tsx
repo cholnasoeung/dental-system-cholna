@@ -201,7 +201,7 @@ export default function PortalPage() {
   if (!currentPatient) {
     return (
       <div className="min-h-screen bg-[linear-gradient(135deg,#ecfeff_0%,#eef6ff_48%,#f8fafc_100%)] p-4 md:p-8">
-        <div className="mx-auto max-w-4xl rounded-[32px] border border-white/80 bg-white/85 p-6 shadow-[0_24px_70px_rgba(15,23,42,0.10)] md:p-10">
+        <div className="w-full rounded-[32px] border border-white/80 bg-white/85 p-6 shadow-[0_24px_70px_rgba(15,23,42,0.10)] md:p-10">
           <p className="text-xs font-semibold uppercase tracking-[0.35em] text-sky-700">
             Patient Portal
           </p>
@@ -274,7 +274,7 @@ export default function PortalPage() {
 
   return (
     <div className="min-h-screen bg-[linear-gradient(135deg,#ecfeff_0%,#eef6ff_48%,#f8fafc_100%)] p-4 md:p-8">
-      <div className="mx-auto max-w-6xl space-y-6">
+      <div className="w-full space-y-6">
         <header className="rounded-[32px] border border-white/80 bg-white/85 p-6 shadow-[0_24px_70px_rgba(15,23,42,0.10)]">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
@@ -551,3 +551,4 @@ export default function PortalPage() {
     </div>
   );
 }
+

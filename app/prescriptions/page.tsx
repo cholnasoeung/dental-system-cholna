@@ -186,7 +186,7 @@ export default function PrescriptionsPage() {
 
   return (
     <AdminShell>
-      <div className="mx-auto max-w-6xl space-y-6">
+      <div className="w-full space-y-6">
         <header className="rounded-[28px] border border-white/80 bg-white/80 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
           <p className="text-xs font-semibold uppercase tracking-[0.35em] text-sky-700">
             Module E
@@ -571,3 +571,4 @@ export default function PrescriptionsPage() {
     </AdminShell>
   );
 }
+

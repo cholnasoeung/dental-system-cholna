@@ -42,8 +42,8 @@ export function AdminShell({ children }: AdminShellProps) {
   const pathname = usePathname();
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(135deg,#f3fafc_0%,#e7f2ff_45%,#f9fbff_100%)] p-4 md:p-6">
-      <main className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-[1500px] overflow-hidden rounded-[28px] border border-white/70 bg-white/75 shadow-[0_30px_80px_rgba(15,23,42,0.10)] backdrop-blur md:min-h-[calc(100vh-3rem)]">
+    <div className="min-h-screen bg-[linear-gradient(135deg,#f3fafc_0%,#e7f2ff_45%,#f9fbff_100%)] p-0">
+      <main className="flex min-h-screen w-full overflow-hidden border-y border-white/70 bg-white/75 shadow-[0_30px_80px_rgba(15,23,42,0.10)] backdrop-blur">
         <aside className="hidden w-[290px] shrink-0 flex-col justify-between bg-[linear-gradient(180deg,#0f172a_0%,#102033_45%,#16324a_100%)] p-6 text-white lg:flex xl:w-[310px] xl:p-8">
           <div>
             <div className="flex items-center gap-3">
