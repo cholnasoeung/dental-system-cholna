@@ -103,6 +103,74 @@ export type DentalRecordFormState = Omit<
   "id" | "patientName" | "clinicalAttachments" | "odontogram"
 >;
 
+export type PaymentMethod = "cash" | "card" | "insurance" | "transfer";
+
+export type InvoiceLine = {
+  treatment: string;
+  quantity: number;
+  unitPrice: number;
+};
+
+export type PaymentRecord = {
+  amount: number;
+  method: PaymentMethod;
+  paidAt: string;
+  reference: string;
+};
+
+export type Invoice = {
+  id: string;
+  patientId: string;
+  patientName: string;
+  invoiceNumber: string;
+  issueDate: string;
+  lineItems: InvoiceLine[];
+  payments: PaymentRecord[];
+  notes: string;
+};
+
+export type InvoiceFormState = {
+  patientId: string;
+  invoiceNumber: string;
+  issueDate: string;
+  notes: string;
+};
+
+export type InvoiceLineFormState = InvoiceLine;
+
+export type PaymentFormState = PaymentRecord;
+
+export type MedicationItem = {
+  name: string;
+  dosage: string;
+  frequency: string;
+  duration: string;
+  instructions: string;
+};
+
+export type Prescription = {
+  id: string;
+  patientId: string;
+  patientName: string;
+  linkedRecordId: string;
+  linkedVisitDate: string;
+  linkedTreatment: string;
+  prescribedDate: string;
+  medications: MedicationItem[];
+  notes: string;
+};
+
+export type PrescriptionFormState = {
+  patientId: string;
+  linkedRecordId: string;
+  linkedVisitDate: string;
+  linkedTreatment: string;
+  prescribedDate: string;
+  notes: string;
+};
+
+export type MedicationItemFormState = MedicationItem;
+
 export const dentists = ["Dr. Lina", "Dr. Sreypov", "Dr. Dara", "Dr. Michael"];
 
 export const statusOptions: AppointmentStatus[] = [
@@ -205,4 +273,48 @@ export const initialDentalRecordForm: DentalRecordFormState = {
   diagnoses: "",
   treatmentPlan: "",
   procedureHistory: "",
+};
+
+export const paymentMethodOptions: PaymentMethod[] = [
+  "cash",
+  "card",
+  "insurance",
+  "transfer",
+];
+
+export const initialInvoiceForm: InvoiceFormState = {
+  patientId: "",
+  invoiceNumber: "",
+  issueDate: "",
+  notes: "",
+};
+
+export const initialInvoiceLineForm: InvoiceLineFormState = {
+  treatment: "",
+  quantity: 1,
+  unitPrice: 0,
+};
+
+export const initialPaymentForm: PaymentFormState = {
+  amount: 0,
+  method: "cash",
+  paidAt: "",
+  reference: "",
+};
+
+export const initialPrescriptionForm: PrescriptionFormState = {
+  patientId: "",
+  linkedRecordId: "",
+  linkedVisitDate: "",
+  linkedTreatment: "",
+  prescribedDate: "",
+  notes: "",
+};
+
+export const initialMedicationItemForm: MedicationItemFormState = {
+  name: "",
+  dosage: "",
+  frequency: "",
+  duration: "",
+  instructions: "",
 };

@@ -1,0 +1,77 @@
+import { NextResponse } from "next/server";
+
+import type { Invoice } from "@/lib/clinic-types";
+import { getDatabase } from "@/lib/mongodb";
+
+type InvoiceDocument = Omit<Invoice, "id"> & {
+  _id?: string;
+};
+
+function serializeInvoice(invoice: InvoiceDocument & { _id: unknown }): Invoice {
+  return {
+    id: String(invoice._id),
+    patientId: invoice.patientId,
+    patientName: invoice.patientName,
+    invoiceNumber: invoice.invoiceNumber,
+    issueDate: invoice.issueDate,
+    lineItems: invoice.lineItems ?? [],
+    payments: invoice.payments ?? [],
+    notes: invoice.notes,
+  };
+}
+
+function errorResponse(message: string, error: unknown) {
+  return NextResponse.json(
+    {
+      error: message,
+      details:
+        process.env.NODE_ENV === "development"
+          ? error instanceof Error
+            ? error.message
+            : String(error)
+          : undefined,
+    },
+    { status: 500 },
+  );
+}
+
+export async function GET() {
+  try {
+    const db = await getDatabase();
+    const invoices = await db
+      .collection<InvoiceDocument>("billing_invoices")
+      .find({})
+      .sort({ issueDate: -1, _id: -1 })
+      .toArray();
+
+    return NextResponse.json(
+      invoices.map((invoice) =>
+        serializeInvoice(invoice as InvoiceDocument & { _id: unknown }),
+      ),
+    );
+  } catch (error) {
+    console.error("GET /api/billing failed", error);
+    return errorResponse("Failed to load invoices from MongoDB.", error);
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const payload = (await request.json()) as Omit<Invoice, "id">;
+    const db = await getDatabase();
+    const result = await db
+      .collection<Omit<Invoice, "id">>("billing_invoices")
+      .insertOne(payload);
+
+    return NextResponse.json(
+      {
+        id: String(result.insertedId),
+        ...payload,
+      },
+      { status: 201 },
+    );
+  } catch (error) {
+    console.error("POST /api/billing failed", error);
+    return errorResponse("Failed to save invoice to MongoDB.", error);
+  }
+}

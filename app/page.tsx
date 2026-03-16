@@ -21,6 +21,18 @@ const quickLinks = [
       "Capture odontogram findings, diagnoses, treatment plans, procedures, and clinical attachments.",
     href: "/emr",
   },
+  {
+    title: "Billing & Payments",
+    description:
+      "Generate invoices, add treatment charges, track partial or full payments, and review outstanding balances.",
+    href: "/billing",
+  },
+  {
+    title: "Prescription Management",
+    description:
+      "Create prescriptions, link them to visits or treatments, print them, and review medication history.",
+    href: "/prescriptions",
+  },
 ];
 
 export default function Home() {

@@ -12,13 +12,13 @@ const menuSections = [
       { label: "Patient Management", href: "/patients" },
       { label: "Appointment Management", href: "/appointments" },
       { label: "Dental Records / EMR", href: "/emr" },
-      { label: "Billing & Payments", href: "#" },
+      { label: "Billing & Payments", href: "/billing" },
     ],
   },
   {
     title: "Operations",
     items: [
-      { label: "Prescription Management", href: "#" },
+      { label: "Prescription Management", href: "/prescriptions" },
       { label: "Staff & Role Management", href: "#" },
       { label: "Notifications", href: "#" },
       { label: "Reports & Analytics", href: "#" },
