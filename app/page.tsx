@@ -33,6 +33,24 @@ const quickLinks = [
       "Create prescriptions, link them to visits or treatments, print them, and review medication history.",
     href: "/prescriptions",
   },
+  {
+    title: "Notifications",
+    description:
+      "Manage SMS and email reminders for appointments, confirmations, payments, and follow-up care.",
+    href: "/notifications",
+  },
+  {
+    title: "Reports & Analytics",
+    description:
+      "Review daily appointments, revenue, outstanding balances, patient growth, dentist workload, and treatment frequency.",
+    href: "/reports",
+  },
+  {
+    title: "Patient Portal",
+    description:
+      "Secure patient access for appointments, treatment history, invoices, prescriptions, and profile updates.",
+    href: "/portal",
+  },
 ];
 
 export default function Home() {

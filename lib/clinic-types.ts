@@ -171,6 +171,33 @@ export type PrescriptionFormState = {
 
 export type MedicationItemFormState = MedicationItem;
 
+export type NotificationCategory =
+  | "appointment-reminder"
+  | "appointment-confirmation"
+  | "payment-reminder"
+  | "follow-up-reminder";
+
+export type NotificationChannel = "sms" | "email";
+
+export type NotificationStatus = "queued" | "sent";
+
+export type NotificationRecord = {
+  id: string;
+  patientId: string;
+  patientName: string;
+  category: NotificationCategory;
+  channel: NotificationChannel;
+  recipient: string;
+  subject: string;
+  message: string;
+  scheduledFor: string;
+  status: NotificationStatus;
+  relatedAppointmentId: string;
+  relatedInvoiceId: string;
+};
+
+export type NotificationFormState = Omit<NotificationRecord, "id" | "status">;
+
 export const dentists = ["Dr. Lina", "Dr. Sreypov", "Dr. Dara", "Dr. Michael"];
 
 export const statusOptions: AppointmentStatus[] = [
@@ -317,4 +344,26 @@ export const initialMedicationItemForm: MedicationItemFormState = {
   frequency: "",
   duration: "",
   instructions: "",
+};
+
+export const notificationCategoryOptions: NotificationCategory[] = [
+  "appointment-reminder",
+  "appointment-confirmation",
+  "payment-reminder",
+  "follow-up-reminder",
+];
+
+export const notificationChannelOptions: NotificationChannel[] = ["sms", "email"];
+
+export const initialNotificationForm: NotificationFormState = {
+  patientId: "",
+  patientName: "",
+  category: "appointment-reminder",
+  channel: "sms",
+  recipient: "",
+  subject: "",
+  message: "",
+  scheduledFor: "",
+  relatedAppointmentId: "",
+  relatedInvoiceId: "",
 };

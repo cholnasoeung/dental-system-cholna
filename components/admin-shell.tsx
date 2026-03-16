@@ -20,14 +20,14 @@ const menuSections = [
     items: [
       { label: "Prescription Management", href: "/prescriptions" },
       { label: "Staff & Role Management", href: "#" },
-      { label: "Notifications", href: "#" },
-      { label: "Reports & Analytics", href: "#" },
+      { label: "Notifications", href: "/notifications" },
+      { label: "Reports & Analytics", href: "/reports" },
     ],
   },
   {
     title: "Access",
     items: [
-      { label: "Patient Portal", href: "#" },
+      { label: "Patient Portal", href: "/portal" },
       { label: "Settings", href: "#" },
       { label: "Audit Trail", href: "#" },
     ],
