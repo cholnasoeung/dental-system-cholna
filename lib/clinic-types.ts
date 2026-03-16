@@ -198,6 +198,30 @@ export type NotificationRecord = {
 
 export type NotificationFormState = Omit<NotificationRecord, "id" | "status">;
 
+export type StaffRole = "dentist" | "receptionist" | "nurse" | "admin" | "manager";
+
+export type StaffScheduleDay = {
+  day: string;
+  start: string;
+  end: string;
+  available: boolean;
+};
+
+export type StaffMember = {
+  id: string;
+  fullName: string;
+  role: StaffRole;
+  email: string;
+  phone: string;
+  permissions: string[];
+  schedule: StaffScheduleDay[];
+  availabilityStatus: "available" | "busy" | "off";
+};
+
+export type StaffFormState = Omit<StaffMember, "id" | "schedule" | "permissions"> & {
+  permissionsText: string;
+};
+
 export const dentists = ["Dr. Lina", "Dr. Sreypov", "Dr. Dara", "Dr. Michael"];
 
 export const statusOptions: AppointmentStatus[] = [
@@ -366,4 +390,40 @@ export const initialNotificationForm: NotificationFormState = {
   scheduledFor: "",
   relatedAppointmentId: "",
   relatedInvoiceId: "",
+};
+
+export const staffRoleOptions: StaffRole[] = [
+  "dentist",
+  "receptionist",
+  "nurse",
+  "admin",
+  "manager",
+];
+
+export const staffPermissionOptions = [
+  "patient-read",
+  "patient-write",
+  "appointment-manage",
+  "billing-manage",
+  "emr-manage",
+  "report-view",
+];
+
+export const defaultWeeklySchedule: StaffScheduleDay[] = [
+  { day: "Monday", start: "08:00", end: "17:00", available: true },
+  { day: "Tuesday", start: "08:00", end: "17:00", available: true },
+  { day: "Wednesday", start: "08:00", end: "17:00", available: true },
+  { day: "Thursday", start: "08:00", end: "17:00", available: true },
+  { day: "Friday", start: "08:00", end: "17:00", available: true },
+  { day: "Saturday", start: "08:00", end: "12:00", available: false },
+  { day: "Sunday", start: "08:00", end: "12:00", available: false },
+];
+
+export const initialStaffForm: StaffFormState = {
+  fullName: "",
+  role: "dentist",
+  email: "",
+  phone: "",
+  permissionsText: "patient-read, appointment-manage",
+  availabilityStatus: "available",
 };

@@ -34,6 +34,12 @@ const quickLinks = [
     href: "/prescriptions",
   },
   {
+    title: "Staff & Role Management",
+    description:
+      "Add staff, assign roles and permissions, manage schedules, and monitor dentist availability.",
+    href: "/staff",
+  },
+  {
     title: "Notifications",
     description:
       "Manage SMS and email reminders for appointments, confirmations, payments, and follow-up care.",

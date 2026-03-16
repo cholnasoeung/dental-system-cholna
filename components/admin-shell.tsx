@@ -19,7 +19,7 @@ const menuSections = [
     title: "Operations",
     items: [
       { label: "Prescription Management", href: "/prescriptions" },
-      { label: "Staff & Role Management", href: "#" },
+      { label: "Staff & Role Management", href: "/staff" },
       { label: "Notifications", href: "/notifications" },
       { label: "Reports & Analytics", href: "/reports" },
     ],
