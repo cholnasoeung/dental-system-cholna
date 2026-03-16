@@ -228,7 +228,7 @@ export default function AppointmentsPage() {
           </div>
         ) : null}
 
-        <div className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
+        <div className="space-y-6">
           <section className="rounded-[28px] border border-white/80 bg-white/85 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
             <h3 className="text-xl font-semibold text-slate-950">Book Appointment</h3>
 
@@ -385,7 +385,7 @@ export default function AppointmentsPage() {
               </div>
             </section>
 
-            <section className="grid gap-6 md:grid-cols-2">
+            <section className="space-y-6">
               <div className="rounded-[28px] border border-white/80 bg-white/85 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
                 <h3 className="text-xl font-semibold text-slate-950">Reminder Queue</h3>
                 <div className="mt-4 space-y-3">
@@ -444,4 +444,5 @@ export default function AppointmentsPage() {
     </AdminShell>
   );
 }
+
 

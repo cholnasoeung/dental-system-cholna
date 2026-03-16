@@ -205,7 +205,7 @@ export default function PortalPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.35em] text-sky-700">
             Patient Portal
           </p>
-          <div className="mt-4 grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
+          <div className="mt-4 space-y-8">
             <div>
               <h1 className="text-4xl font-semibold tracking-tight text-slate-950">
                 Secure patient access
@@ -311,7 +311,7 @@ export default function PortalPage() {
           </div>
         ) : null}
 
-        <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
+        <div className="space-y-6">
           <section className="rounded-[28px] border border-white/80 bg-white/85 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
             <h2 className="text-2xl font-semibold text-slate-950">Appointments</h2>
             <div className="mt-4 space-y-3">
@@ -373,7 +373,7 @@ export default function PortalPage() {
           </section>
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
+        <div className="space-y-6">
           <section className="rounded-[28px] border border-white/80 bg-white/85 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-semibold text-slate-950">Invoices</h2>
@@ -551,4 +551,5 @@ export default function PortalPage() {
     </div>
   );
 }
+
 

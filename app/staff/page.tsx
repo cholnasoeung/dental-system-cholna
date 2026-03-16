@@ -192,7 +192,7 @@ export default function StaffPage() {
           </div>
         ) : null}
 
-        <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
+        <div className="space-y-6">
           <section className="rounded-[28px] border border-white/80 bg-white/85 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
             <h3 className="text-xl font-semibold text-slate-950">Add Staff Member</h3>
 
@@ -417,4 +417,5 @@ export default function StaffPage() {
     </AdminShell>
   );
 }
+
 
