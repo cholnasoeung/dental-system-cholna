@@ -19,6 +19,8 @@ const upperLeftTeeth = ["18", "17", "16", "15", "14", "13", "12", "11"];
 const upperRightTeeth = ["21", "22", "23", "24", "25", "26", "27", "28"];
 const lowerLeftTeeth = ["48", "47", "46", "45", "44", "43", "42", "41"];
 const lowerRightTeeth = ["31", "32", "33", "34", "35", "36", "37", "38"];
+const upperArchTeeth = [...upperLeftTeeth, ...upperRightTeeth];
+const lowerArchTeeth = [...lowerLeftTeeth, ...lowerRightTeeth];
 
 function getToothType(toothNumber: string) {
   const position = Number(toothNumber.slice(1));
@@ -88,10 +90,10 @@ function ToothIllustration({
                 : "text-slate-400";
 
   return (
-    <div className="relative flex h-28 items-center justify-center">
+    <div className="relative flex h-16 items-center justify-center md:h-20">
       <svg
         viewBox="0 0 60 104"
-        className={`h-24 w-14 ${outlineClass} ${isLower ? "rotate-180" : ""}`}
+        className={`h-14 w-8 md:h-16 md:w-10 ${outlineClass} ${isLower ? "rotate-180" : ""}`}
         fill="none"
         stroke="currentColor"
         strokeWidth="1.6"
@@ -128,7 +130,7 @@ function ToothIllustration({
 
       {condition === "missing" ? (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <svg viewBox="0 0 100 100" className="h-24 w-14 text-rose-600">
+          <svg viewBox="0 0 100 100" className="h-14 w-8 text-rose-600 md:h-16 md:w-10">
             <path
               d="M18 14 82 86M82 14 18 86"
               stroke="currentColor"
@@ -141,7 +143,7 @@ function ToothIllustration({
 
       {condition === "implant" ? (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <svg viewBox="0 0 100 100" className="h-24 w-14 text-emerald-500">
+          <svg viewBox="0 0 100 100" className="h-14 w-8 text-emerald-500 md:h-16 md:w-10">
             <path
               d="M28 16 72 84M72 16 28 84"
               stroke="currentColor"
@@ -178,7 +180,7 @@ function OdontogramRow({
         </p>
         <div className="h-px flex-1 bg-slate-200 ml-4" />
       </div>
-      <div className="grid grid-cols-4 gap-2 md:grid-cols-8 xl:gap-3">
+      <div className="grid grid-cols-4 gap-2 sm:grid-cols-8 xl:grid-cols-[repeat(16,minmax(0,1fr))] xl:gap-2">
         {teeth.map((toothNumber) => {
           const tooth = toothLookup.get(toothNumber);
 
@@ -193,7 +195,7 @@ function OdontogramRow({
               key={toothNumber}
               type="button"
               onClick={() => onSelectTooth(toothNumber)}
-              className={`rounded-[22px] border px-1.5 py-2 transition md:rounded-[26px] md:px-2 md:py-3 ${
+              className={`rounded-[18px] border px-1 py-1.5 transition md:rounded-[22px] md:px-1.5 md:py-2 ${
                 isSelected
                   ? "border-sky-300 bg-sky-50 shadow-[0_14px_30px_rgba(14,165,233,0.14)]"
                   : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
@@ -205,7 +207,7 @@ function OdontogramRow({
                 isSelected={isSelected}
                 isLower={isLower}
               />
-              <p className="mt-1 text-center text-sm font-semibold text-slate-900 md:text-base">
+              <p className="mt-1 text-center text-xs font-semibold text-slate-900 md:text-sm">
                 {toothNumber}
               </p>
             </button>
@@ -575,31 +577,16 @@ export default function EmrPage() {
                   <div className="space-y-5">
                     <div className="space-y-5 rounded-[26px] border border-slate-200/80 bg-white/80 p-4 md:p-5">
                       <OdontogramRow
-                        title="Upper Right"
-                        teeth={upperLeftTeeth}
-                        selectedToothNumber={selectedToothNumber}
-                        toothLookup={toothLookup}
-                        onSelectTooth={setSelectedToothNumber}
-                      />
-                      <OdontogramRow
-                        title="Upper Left"
-                        teeth={upperRightTeeth}
+                        title="Upper Arch"
+                        teeth={upperArchTeeth}
                         selectedToothNumber={selectedToothNumber}
                         toothLookup={toothLookup}
                         onSelectTooth={setSelectedToothNumber}
                       />
                       <div className="h-px bg-slate-200" />
                       <OdontogramRow
-                        title="Lower Right"
-                        teeth={lowerLeftTeeth}
-                        isLower
-                        selectedToothNumber={selectedToothNumber}
-                        toothLookup={toothLookup}
-                        onSelectTooth={setSelectedToothNumber}
-                      />
-                      <OdontogramRow
-                        title="Lower Left"
-                        teeth={lowerRightTeeth}
+                        title="Lower Arch"
+                        teeth={lowerArchTeeth}
                         isLower
                         selectedToothNumber={selectedToothNumber}
                         toothLookup={toothLookup}
