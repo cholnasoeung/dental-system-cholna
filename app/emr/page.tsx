@@ -254,6 +254,7 @@ export default function EmrPage() {
     })),
   );
   const [selectedToothNumber, setSelectedToothNumber] = useState("11");
+  const [showClinicalDetails, setShowClinicalDetails] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -438,7 +439,7 @@ export default function EmrPage() {
           </div>
         ) : null}
 
-        <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.2fr)_360px]">
+        <div className="space-y-6">
           <section className="rounded-[28px] border border-white/80 bg-white/85 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
             <h3 className="text-xl font-semibold text-slate-950">Create EMR Entry</h3>
 
@@ -486,53 +487,79 @@ export default function EmrPage() {
                 </label>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="space-y-1">
-                  <span className="text-sm font-medium text-slate-700">
-                    Consultation Notes
+              <div className="rounded-[24px] border border-slate-200 bg-slate-50/80 p-4">
+                <button
+                  type="button"
+                  onClick={() => setShowClinicalDetails((current) => !current)}
+                  className="flex w-full items-center justify-between gap-4 rounded-2xl bg-white px-4 py-3 text-left shadow-[0_10px_24px_rgba(15,23,42,0.04)] transition hover:bg-slate-50"
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">
+                      Clinical Notes & Treatment Details
+                    </p>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {showClinicalDetails
+                        ? "Hide consultation notes, diagnosis, treatment plan, and procedure history."
+                        : "Click to add consultation notes, diagnosis, treatment plan, and procedure history."}
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">
+                    {showClinicalDetails ? "Hide" : "Show"}
                   </span>
-                  <textarea
-                    name="consultationNotes"
-                    value={recordForm.consultationNotes}
-                    onChange={handleFieldChange}
-                    placeholder="Clinical findings and observations"
-                    className="min-h-28 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white"
-                  />
-                </label>
-                <label className="space-y-1">
-                  <span className="text-sm font-medium text-slate-700">Diagnoses</span>
-                  <textarea
-                    name="diagnoses"
-                    value={recordForm.diagnoses}
-                    onChange={handleFieldChange}
-                    placeholder="Pulpitis, caries, gingivitis"
-                    className="min-h-28 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white"
-                  />
-                </label>
-                <label className="space-y-1">
-                  <span className="text-sm font-medium text-slate-700">
-                    Treatment Plan
-                  </span>
-                  <textarea
-                    name="treatmentPlan"
-                    value={recordForm.treatmentPlan}
-                    onChange={handleFieldChange}
-                    placeholder="Scaling, filling, crown, review after 2 weeks"
-                    className="min-h-28 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white"
-                  />
-                </label>
-                <label className="space-y-1">
-                  <span className="text-sm font-medium text-slate-700">
-                    Procedure History
-                  </span>
-                  <textarea
-                    name="procedureHistory"
-                    value={recordForm.procedureHistory}
-                    onChange={handleFieldChange}
-                    placeholder="Completed procedures and visit summary"
-                    className="min-h-28 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white"
-                  />
-                </label>
+                </button>
+
+                {showClinicalDetails ? (
+                  <div className="mt-4 grid gap-4 md:grid-cols-2">
+                    <label className="space-y-1">
+                      <span className="text-sm font-medium text-slate-700">
+                        Consultation Notes
+                      </span>
+                      <textarea
+                        name="consultationNotes"
+                        value={recordForm.consultationNotes}
+                        onChange={handleFieldChange}
+                        placeholder="Clinical findings and observations"
+                        className="min-h-28 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400"
+                      />
+                    </label>
+                    <label className="space-y-1">
+                      <span className="text-sm font-medium text-slate-700">
+                        Diagnoses
+                      </span>
+                      <textarea
+                        name="diagnoses"
+                        value={recordForm.diagnoses}
+                        onChange={handleFieldChange}
+                        placeholder="Pulpitis, caries, gingivitis"
+                        className="min-h-28 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400"
+                      />
+                    </label>
+                    <label className="space-y-1">
+                      <span className="text-sm font-medium text-slate-700">
+                        Treatment Plan
+                      </span>
+                      <textarea
+                        name="treatmentPlan"
+                        value={recordForm.treatmentPlan}
+                        onChange={handleFieldChange}
+                        placeholder="Scaling, filling, crown, review after 2 weeks"
+                        className="min-h-28 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400"
+                      />
+                    </label>
+                    <label className="space-y-1">
+                      <span className="text-sm font-medium text-slate-700">
+                        Procedure History
+                      </span>
+                      <textarea
+                        name="procedureHistory"
+                        value={recordForm.procedureHistory}
+                        onChange={handleFieldChange}
+                        placeholder="Completed procedures and visit summary"
+                        className="min-h-28 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400"
+                      />
+                    </label>
+                  </div>
+                ) : null}
               </div>
 
               <div>
@@ -711,7 +738,7 @@ export default function EmrPage() {
             </form>
           </section>
 
-          <aside className="space-y-6">
+          <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
             <section className="rounded-[28px] border border-white/80 bg-white/85 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
               <h3 className="text-xl font-semibold text-slate-950">Attachment Queue</h3>
               <div className="mt-4 space-y-3">
@@ -781,7 +808,7 @@ export default function EmrPage() {
                 )}
               </div>
             </section>
-          </aside>
+          </div>
         </div>
       </div>
     </AdminShell>

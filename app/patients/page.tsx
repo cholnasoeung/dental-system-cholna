@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 
 import { AdminShell } from "@/components/admin-shell";
@@ -333,7 +334,11 @@ export default function PatientsPage() {
                   </p>
                 ) : (
                   patients.map((patient) => (
-                    <article key={patient.id} className="rounded-3xl border border-white/10 bg-white/6 p-4">
+                    <Link
+                      key={patient.id}
+                      href={`/patients/${patient.id}`}
+                      className="block rounded-3xl border border-white/10 bg-white/6 p-4 transition hover:bg-white/10"
+                    >
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="font-semibold text-white">{patient.fullName}</p>
@@ -341,12 +346,15 @@ export default function PatientsPage() {
                             {patient.phone}
                             {patient.email ? ` | ${patient.email}` : ""}
                           </p>
+                          <p className="mt-3 text-xs uppercase tracking-[0.24em] text-cyan-200/70">
+                            Click to view patient record
+                          </p>
                         </div>
                         <span className="rounded-full bg-cyan-300 px-3 py-1 text-xs font-semibold text-slate-950">
                           {patient.id}
                         </span>
                       </div>
-                    </article>
+                    </Link>
                   ))
                 )}
               </div>

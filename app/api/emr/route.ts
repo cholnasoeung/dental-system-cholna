@@ -40,12 +40,14 @@ function errorResponse(message: string, error: unknown) {
   );
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const patientId = searchParams.get("patientId");
     const db = await getDatabase();
     const records = await db
       .collection<DentalRecordDocument>("emr_records")
-      .find({})
+      .find(patientId ? { patientId } : {})
       .sort({ visitDate: -1, _id: -1 })
       .toArray();
 
