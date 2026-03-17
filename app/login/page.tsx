@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { Suspense, FormEvent, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FormEvent, useState } from "react";
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/";
@@ -36,65 +36,87 @@ export default function LoginPage() {
       router.push(callbackUrl);
       router.refresh();
     } catch (error) {
-      console.error(error);
-      setErrorMessage(error instanceof Error ? error.message : "Login failed.");
+      setErrorMessage(
+        error instanceof Error ? error.message : "Something went wrong."
+      );
     } finally {
       setIsSubmitting(false);
     }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[linear-gradient(135deg,#eff9ff_0%,#e8f1ff_48%,#f8fbff_100%)] p-6">
-      <div className="w-full max-w-md rounded-[32px] border border-white/80 bg-white/90 p-8 shadow-[0_30px_80px_rgba(15,23,42,0.10)]">
-        <p className="text-xs font-semibold uppercase tracking-[0.35em] text-sky-700">
-          DentalFlow Access
-        </p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-          Login
-        </h1>
-        <p className="mt-3 text-sm leading-6 text-slate-600">
-          Sign in with your registered email and password.
+    <main className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <div className="w-full max-w-md rounded-lg bg-white p-8 shadow">
+        <h1 className="mb-2 text-2xl font-bold text-gray-900">Login</h1>
+        <p className="mb-6 text-sm text-gray-600">
+          Sign in to continue to your dashboard.
         </p>
 
-        {errorMessage ? (
-          <div className="mt-6 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-            {errorMessage}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label
+              htmlFor="email"
+              className="mb-1 block text-sm font-medium text-gray-700"
+            >
+              Email
+            </label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+              className="w-full rounded-md border border-gray-300 px-3 py-2 outline-none focus:border-gray-500"
+              placeholder="Enter your email"
+            />
           </div>
-        ) : null}
 
-        <form className="mt-8 space-y-4" onSubmit={handleSubmit}>
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            placeholder="Email"
-            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white"
-          />
-          <input
-            type="password"
-            required
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            placeholder="Password"
-            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white"
-          />
+          <div>
+            <label
+              htmlFor="password"
+              className="mb-1 block text-sm font-medium text-gray-700"
+            >
+              Password
+            </label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+              className="w-full rounded-md border border-gray-300 px-3 py-2 outline-none focus:border-gray-500"
+              placeholder="Enter your password"
+            />
+          </div>
+
+          {errorMessage ? (
+            <p className="text-sm text-red-600">{errorMessage}</p>
+          ) : null}
+
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+            className="w-full rounded-md bg-black px-4 py-2 text-white disabled:opacity-60"
           >
-            {isSubmitting ? "Signing In..." : "Sign In"}
+            {isSubmitting ? "Signing in..." : "Login"}
           </button>
         </form>
 
-        <p className="mt-6 text-sm text-slate-600">
-          No account yet?{" "}
-          <Link href="/register" className="font-semibold text-sky-700">
-            Register here
+        <p className="mt-4 text-sm text-gray-600">
+          Don&apos;t have an account?{" "}
+          <Link href="/register" className="font-medium text-black underline">
+            Register
           </Link>
         </p>
       </div>
-    </div>
+    </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <LoginPageContent />
+    </Suspense>
   );
 }
