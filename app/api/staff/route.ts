@@ -4,6 +4,7 @@ import type { StaffMember } from "@/lib/clinic-types";
 import { getDatabase } from "@/lib/mongodb";
 
 type StaffDocument = Omit<StaffMember, "id"> & {
+  passwordHash?: string;
   _id?: string;
 };
 
@@ -57,7 +58,10 @@ export async function POST(request: Request) {
   try {
     const payload = (await request.json()) as Omit<StaffMember, "id">;
     const db = await getDatabase();
-    const result = await db.collection<Omit<StaffMember, "id">>("staff").insertOne(payload);
+    const result = await db.collection<StaffDocument>("staff").insertOne({
+      ...payload,
+      email: payload.email.trim().toLowerCase(),
+    });
 
     return NextResponse.json(
       {

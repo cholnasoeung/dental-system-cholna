@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ReactNode } from "react";
 
+import { AuthUserPanel } from "@/components/auth-user-panel";
+
 const menuSections = [
   {
     title: "Core",
@@ -105,20 +107,7 @@ export function AdminShell({ children }: AdminShellProps) {
             </nav>
           </div>
 
-          <div className="mt-8 rounded-3xl bg-white/8 p-4 ring-1 ring-white/10">
-            <p className="text-xs uppercase tracking-[0.28em] text-cyan-200/70">
-              Signed In
-            </p>
-            <div className="mt-3 flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-300 text-sm font-bold text-slate-950">
-                AD
-              </div>
-              <div>
-                <p className="font-medium text-white">Admin User</p>
-                <p className="text-sm text-slate-300">System Administrator</p>
-              </div>
-            </div>
-          </div>
+          <AuthUserPanel />
         </aside>
 
         <section className="h-screen flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.10),transparent_22%),linear-gradient(180deg,#f9fdff_0%,#eef6ff_100%)] p-4 md:p-6 xl:p-8">
