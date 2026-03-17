@@ -42,6 +42,8 @@ export default function PatientsPage() {
   const [patients, setPatients] = useState<PatientProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingPatient, setIsSavingPatient] = useState(false);
+  const [editingPatientId, setEditingPatientId] = useState("");
+  const [deletingPatientId, setDeletingPatientId] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
@@ -91,9 +93,77 @@ export default function PatientsPage() {
     setPatientXrays(files);
   }
 
+  function resetPatientForm() {
+    setPatientForm(initialPatientForm);
+    setPatientDocuments([]);
+    setPatientXrays([]);
+    setEditingPatientId("");
+  }
+
+  function handleEditPatient(patient: PatientProfile) {
+    setPatientForm({
+      fullName: patient.fullName,
+      dateOfBirth: patient.dateOfBirth,
+      gender: patient.gender,
+      phone: patient.phone,
+      email: patient.email,
+      address: patient.address,
+      occupation: patient.occupation,
+      emergencyContactName: patient.emergencyContactName,
+      emergencyContactRelation: patient.emergencyContactRelation,
+      emergencyContactPhone: patient.emergencyContactPhone,
+      medicalHistory: patient.medicalHistory,
+      allergies: patient.allergies,
+      insuranceProvider: patient.insuranceProvider,
+      policyNumber: patient.policyNumber,
+      insuranceExpiry: patient.insuranceExpiry,
+    });
+    setPatientDocuments(patient.documents);
+    setPatientXrays(patient.xrays);
+    setEditingPatientId(patient.id);
+    setErrorMessage("");
+  }
+
+  async function handleDeletePatient(patientId: string) {
+    const patient = patients.find((item) => item.id === patientId);
+
+    if (
+      !window.confirm(
+        `Delete patient${patient?.fullName ? ` ${patient.fullName}` : ""}?`,
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setDeletingPatientId(patientId);
+      setErrorMessage("");
+
+      const response = await fetch(`/api/patients/${patientId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      setPatients((current) => current.filter((patient) => patient.id !== patientId));
+
+      if (editingPatientId === patientId) {
+        resetPatientForm();
+      }
+    } catch (error) {
+      console.error(error);
+      setErrorMessage(
+        error instanceof Error ? error.message : "Unable to delete patient.",
+      );
+    } finally {
+      setDeletingPatientId("");
+    }
+  }
+
   async function handlePatientSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = event.currentTarget;
 
     if (!patientForm.fullName || !patientForm.phone || !patientForm.dateOfBirth) {
       return;
@@ -103,34 +173,52 @@ export default function PatientsPage() {
       setIsSavingPatient(true);
       setErrorMessage("");
 
-      const response = await fetch("/api/patients", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const response = await fetch(
+        editingPatientId ? `/api/patients/${editingPatientId}` : "/api/patients",
+        {
+          method: editingPatientId ? "PATCH" : "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            ...patientForm,
+            documents: patientDocuments,
+            xrays: patientXrays,
+          }),
         },
-        body: JSON.stringify({
-          ...patientForm,
-          documents: patientDocuments,
-          xrays: patientXrays,
-        }),
-      });
+      );
 
       if (!response.ok) {
         throw new Error(await response.text());
       }
 
-      const nextPatient = (await response.json()) as PatientProfile;
-      setPatients((current) => [nextPatient, ...current]);
-      setPatientForm(initialPatientForm);
-      setPatientDocuments([]);
-      setPatientXrays([]);
-      form.reset();
+      if (editingPatientId) {
+        setPatients((current) =>
+          current.map((patient) =>
+            patient.id === editingPatientId
+              ? {
+                  ...patient,
+                  ...patientForm,
+                  documents: patientDocuments,
+                  xrays: patientXrays,
+                }
+              : patient,
+          ),
+        );
+      } else {
+        const nextPatient = (await response.json()) as PatientProfile;
+        setPatients((current) => [nextPatient, ...current]);
+      }
+
+      resetPatientForm();
     } catch (error) {
       console.error(error);
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : "Patient profile could not be saved to MongoDB.",
+          : editingPatientId
+            ? "Patient profile could not be updated."
+            : "Patient profile could not be saved to MongoDB.",
       );
     } finally {
       setIsSavingPatient(false);
@@ -196,7 +284,20 @@ export default function PatientsPage() {
 
         <div className="space-y-6">
           <section className="rounded-[28px] border border-white/80 bg-white/85 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
-            <h3 className="text-xl font-semibold text-slate-950">Create Patient Profile</h3>
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-xl font-semibold text-slate-950">
+                {editingPatientId ? "Edit Patient Profile" : "Create Patient Profile"}
+              </h3>
+              {editingPatientId ? (
+                <button
+                  type="button"
+                  onClick={resetPatientForm}
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                >
+                  Cancel Edit
+                </button>
+              ) : null}
+            </div>
 
             <form className="mt-6 space-y-6" onSubmit={handlePatientSubmit}>
               <div className="grid gap-4 md:grid-cols-2">
@@ -279,7 +380,13 @@ export default function PatientsPage() {
               </div>
 
               <button type="submit" disabled={isSavingPatient} className="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300">
-                {isSavingPatient ? "Saving Patient..." : "Save Patient Profile"}
+                {isSavingPatient
+                  ? editingPatientId
+                    ? "Updating Patient..."
+                    : "Saving Patient..."
+                  : editingPatientId
+                    ? "Update Patient Profile"
+                    : "Save Patient Profile"}
               </button>
             </form>
           </section>
@@ -334,13 +441,15 @@ export default function PatientsPage() {
                   </p>
                 ) : (
                   patients.map((patient) => (
-                    <Link
+                    <article
                       key={patient.id}
-                      href={`/patients/${patient.id}`}
-                      className="block rounded-3xl border border-white/10 bg-white/6 p-4 transition hover:bg-white/10"
+                      className="rounded-3xl border border-white/10 bg-white/6 p-4"
                     >
                       <div className="flex items-start justify-between gap-3">
-                        <div>
+                        <Link
+                          href={`/patients/${patient.id}`}
+                          className="block min-w-0 flex-1 transition hover:opacity-90"
+                        >
                           <p className="font-semibold text-white">{patient.fullName}</p>
                           <p className="mt-1 text-sm text-slate-300">
                             {patient.phone}
@@ -349,12 +458,30 @@ export default function PatientsPage() {
                           <p className="mt-3 text-xs uppercase tracking-[0.24em] text-cyan-200/70">
                             Click to view patient record
                           </p>
-                        </div>
+                        </Link>
                         <span className="rounded-full bg-cyan-300 px-3 py-1 text-xs font-semibold text-slate-950">
                           {patient.id}
                         </span>
                       </div>
-                    </Link>
+
+                      <div className="mt-4 flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleEditPatient(patient)}
+                          className="rounded-2xl bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeletePatient(patient.id)}
+                          disabled={deletingPatientId === patient.id}
+                          className="rounded-2xl bg-rose-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-400 disabled:cursor-not-allowed disabled:bg-rose-300"
+                        >
+                          {deletingPatientId === patient.id ? "Deleting..." : "Delete"}
+                        </button>
+                      </div>
+                    </article>
                   ))
                 )}
               </div>

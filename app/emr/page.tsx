@@ -6,6 +6,7 @@ import { AdminShell } from "@/components/admin-shell";
 import {
   initialDentalRecordForm,
   odontogramToothNumbers,
+  treatmentStatusOptions,
   toothConditionOptions,
   type ClinicalAttachment,
   type DentalRecord,
@@ -547,6 +548,35 @@ export default function EmrPage() {
                         placeholder="Scaling, filling, crown, review after 2 weeks"
                         className="min-h-28 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400"
                       />
+                    </label>
+                    <label className="space-y-1">
+                      <span className="text-sm font-medium text-slate-700">
+                        Current Treatment Step
+                      </span>
+                      <input
+                        name="treatmentStep"
+                        value={recordForm.treatmentStep}
+                        onChange={handleFieldChange}
+                        placeholder="Step 1: X-ray and diagnosis"
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400"
+                      />
+                    </label>
+                    <label className="space-y-1">
+                      <span className="text-sm font-medium text-slate-700">
+                        Treatment Status
+                      </span>
+                      <select
+                        name="treatmentStatus"
+                        value={recordForm.treatmentStatus}
+                        onChange={handleFieldChange}
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400"
+                      >
+                        {treatmentStatusOptions.map((status) => (
+                          <option key={status} value={status}>
+                            {status}
+                          </option>
+                        ))}
+                      </select>
                     </label>
                     <label className="space-y-1">
                       <span className="text-sm font-medium text-slate-700">

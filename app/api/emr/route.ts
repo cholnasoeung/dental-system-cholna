@@ -19,6 +19,8 @@ function serializeDentalRecord(
     consultationNotes: record.consultationNotes,
     diagnoses: record.diagnoses,
     treatmentPlan: record.treatmentPlan,
+    treatmentStep: record.treatmentStep ?? "",
+    treatmentStatus: record.treatmentStatus ?? "planned",
     procedureHistory: record.procedureHistory,
     clinicalAttachments: record.clinicalAttachments ?? [],
     odontogram: record.odontogram ?? [],

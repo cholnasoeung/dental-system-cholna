@@ -88,3 +88,20 @@ export async function PATCH(
     return errorResponse("Failed to update patient profile.", error);
   }
 }
+
+export async function DELETE(
+  _request: Request,
+  context: { params: Promise<{ id: string }> },
+) {
+  try {
+    const { id } = await context.params;
+    const db = await getDatabase();
+
+    await db.collection("patients").deleteOne({ _id: new ObjectId(id) });
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("DELETE /api/patients/[id] failed", error);
+    return errorResponse("Failed to delete patient profile.", error);
+  }
+}

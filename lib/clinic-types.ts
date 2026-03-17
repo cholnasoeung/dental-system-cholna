@@ -72,6 +72,8 @@ export type ToothCondition =
   | "implant"
   | "root-canal";
 
+export type TreatmentStatus = "planned" | "in-progress" | "completed";
+
 export type OdontogramTooth = {
   toothNumber: string;
   condition: ToothCondition;
@@ -93,6 +95,8 @@ export type DentalRecord = {
   consultationNotes: string;
   diagnoses: string;
   treatmentPlan: string;
+  treatmentStep: string;
+  treatmentStatus: TreatmentStatus;
   procedureHistory: string;
   clinicalAttachments: ClinicalAttachment[];
   odontogram: OdontogramTooth[];
@@ -323,8 +327,16 @@ export const initialDentalRecordForm: DentalRecordFormState = {
   consultationNotes: "",
   diagnoses: "",
   treatmentPlan: "",
+  treatmentStep: "",
+  treatmentStatus: "planned",
   procedureHistory: "",
 };
+
+export const treatmentStatusOptions: TreatmentStatus[] = [
+  "planned",
+  "in-progress",
+  "completed",
+];
 
 export const paymentMethodOptions: PaymentMethod[] = [
   "cash",
