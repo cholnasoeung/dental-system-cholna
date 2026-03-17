@@ -42,9 +42,9 @@ export function AdminShell({ children }: AdminShellProps) {
   const pathname = usePathname();
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(135deg,#f3fafc_0%,#e7f2ff_45%,#f9fbff_100%)] p-0">
-      <main className="flex min-h-screen w-full overflow-hidden border-y border-white/70 bg-white/75 shadow-[0_30px_80px_rgba(15,23,42,0.10)] backdrop-blur">
-        <aside className="hidden w-[290px] shrink-0 flex-col justify-between bg-[linear-gradient(180deg,#0f172a_0%,#102033_45%,#16324a_100%)] p-6 text-white lg:flex xl:w-[310px] xl:p-8">
+    <div className="h-screen overflow-hidden bg-[linear-gradient(135deg,#f3fafc_0%,#e7f2ff_45%,#f9fbff_100%)] p-0">
+      <main className="flex h-screen w-full overflow-hidden border-y border-white/70 bg-white/75 shadow-[0_30px_80px_rgba(15,23,42,0.10)] backdrop-blur">
+        <aside className="sticky top-0 hidden h-screen w-[290px] shrink-0 flex-col justify-between overflow-y-auto bg-[linear-gradient(180deg,#0f172a_0%,#102033_45%,#16324a_100%)] p-6 text-white lg:flex xl:w-[310px] xl:p-8">
           <div>
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-400/20 text-lg font-bold text-cyan-200 ring-1 ring-white/10">
@@ -121,7 +121,7 @@ export function AdminShell({ children }: AdminShellProps) {
           </div>
         </aside>
 
-        <section className="flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.10),transparent_22%),linear-gradient(180deg,#f9fdff_0%,#eef6ff_100%)] p-4 md:p-6 xl:p-8">
+        <section className="h-screen flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.10),transparent_22%),linear-gradient(180deg,#f9fdff_0%,#eef6ff_100%)] p-4 md:p-6 xl:p-8">
           {children}
         </section>
       </main>
