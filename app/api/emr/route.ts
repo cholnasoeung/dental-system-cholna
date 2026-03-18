@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { upsertAutoInvoiceForRecord } from "@/lib/billing";
 import type { DentalRecord } from "@/lib/clinic-types";
 import { getDatabase } from "@/lib/mongodb";
 
@@ -29,6 +30,7 @@ function serializeDentalRecord(
       notes: tooth.notes ?? "",
       treatmentProcess: tooth.treatmentProcess ?? "",
       treatmentStatus: tooth.treatmentStatus ?? "planned",
+      billableTreatmentId: tooth.billableTreatmentId ?? "",
     })),
   };
 }
@@ -78,11 +80,15 @@ export async function POST(request: Request) {
       .collection<Omit<DentalRecord, "id">>("emr_records")
       .insertOne(payload);
 
+    const nextRecord = {
+      id: String(result.insertedId),
+      ...payload,
+    } satisfies DentalRecord;
+
+    await upsertAutoInvoiceForRecord(db, nextRecord);
+
     return NextResponse.json(
-      {
-        id: String(result.insertedId),
-        ...payload,
-      },
+      nextRecord,
       { status: 201 },
     );
   } catch (error) {

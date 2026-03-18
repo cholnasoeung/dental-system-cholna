@@ -6,6 +6,7 @@ import { AdminShell } from "@/components/admin-shell";
 import {
   initialDentalRecordForm,
   odontogramToothNumbers,
+  treatmentCatalog,
   treatmentStatusOptions,
   toothConditionOptions,
   type ClinicalAttachment,
@@ -82,6 +83,7 @@ function normalizeTooth(tooth: OdontogramTooth): OdontogramTooth {
     notes: tooth.notes ?? "",
     treatmentProcess: tooth.treatmentProcess ?? "",
     treatmentStatus: tooth.treatmentStatus ?? "planned",
+    billableTreatmentId: tooth.billableTreatmentId ?? "",
   };
 }
 
@@ -308,6 +310,7 @@ export default function EmrPage() {
       notes: "",
       treatmentProcess: "",
       treatmentStatus: "planned",
+      billableTreatmentId: "",
     })),
   );
   const [selectedToothNumber, setSelectedToothNumber] = useState("11");
@@ -364,7 +367,12 @@ export default function EmrPage() {
 
   function handleToothChange(
     toothNumber: string,
-    field: "condition" | "notes" | "treatmentProcess" | "treatmentStatus",
+    field:
+      | "condition"
+      | "notes"
+      | "treatmentProcess"
+      | "treatmentStatus"
+      | "billableTreatmentId",
     value: string,
   ) {
     setOdontogram((current) =>
@@ -417,6 +425,7 @@ export default function EmrPage() {
           notes: "",
           treatmentProcess: "",
           treatmentStatus: "planned",
+          billableTreatmentId: "",
         })),
       );
       form.reset();
@@ -714,6 +723,12 @@ export default function EmrPage() {
                           >
                             {(selectedTooth.treatmentStatus ?? "planned").replace("-", " ")}
                           </span>
+                          <p className="mt-2 text-xs font-medium uppercase tracking-[0.22em] text-slate-500">
+                            Billing:{" "}
+                            {treatmentCatalog.find(
+                              (item) => item.id === selectedTooth.billableTreatmentId,
+                            )?.name ?? "Not billable"}
+                          </p>
                         </div>
 
                         <div className="mt-4 rounded-3xl bg-slate-50 p-4">
@@ -774,6 +789,30 @@ export default function EmrPage() {
                         </div>
 
                         <div className="mt-4 grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
+                          <label className="space-y-1">
+                            <span className="text-sm font-medium text-slate-700">
+                              Billable Treatment
+                            </span>
+                            <select
+                              value={selectedTooth.billableTreatmentId}
+                              onChange={(event) =>
+                                handleToothChange(
+                                  selectedTooth.toothNumber,
+                                  "billableTreatmentId",
+                                  event.target.value,
+                                )
+                              }
+                              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white"
+                            >
+                              <option value="">Not billable</option>
+                              {treatmentCatalog.map((item) => (
+                                <option key={item.id} value={item.id}>
+                                  {item.name} - ${item.defaultPrice} / {item.pricingModel}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+
                           <label className="space-y-1">
                             <span className="text-sm font-medium text-slate-700">
                               Tooth Treatment Status

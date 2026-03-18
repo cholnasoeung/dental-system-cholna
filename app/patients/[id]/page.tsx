@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { AdminShell } from "@/components/admin-shell";
 import {
+  treatmentCatalog,
   toothConditionOptions,
   treatmentStatusOptions,
   type DentalRecord,
@@ -125,6 +126,7 @@ function normalizeTooth(tooth: OdontogramTooth): OdontogramTooth {
     notes: tooth.notes ?? "",
     treatmentProcess: tooth.treatmentProcess ?? "",
     treatmentStatus: tooth.treatmentStatus ?? "planned",
+    billableTreatmentId: tooth.billableTreatmentId ?? "",
   };
 }
 
@@ -402,7 +404,12 @@ export default function PatientDetailPage() {
   function updateToothField(
     recordId: string,
     toothNumber: string,
-    field: "condition" | "notes" | "treatmentProcess" | "treatmentStatus",
+    field:
+      | "condition"
+      | "notes"
+      | "treatmentProcess"
+      | "treatmentStatus"
+      | "billableTreatmentId",
     value: string,
   ) {
     setRecords((current) =>
@@ -888,6 +895,12 @@ export default function PatientDetailPage() {
                                   >
                                     {(selectedTooth.treatmentStatus ?? "planned").replace("-", " ")}
                                   </span>
+                                  <p className="mt-2 text-xs font-medium uppercase tracking-[0.22em] text-slate-500">
+                                    Billing:{" "}
+                                    {treatmentCatalog.find(
+                                      (item) => item.id === selectedTooth.billableTreatmentId,
+                                    )?.name ?? "Not billable"}
+                                  </p>
                                 </div>
                                 <div className="rounded-3xl bg-white p-4 ring-1 ring-slate-200">
                                   <div className="grid gap-4 md:grid-cols-[220px_minmax(0,1fr)]">
@@ -935,6 +948,30 @@ export default function PatientDetailPage() {
                                   </div>
 
                                   <div className="mt-4 grid gap-4 md:grid-cols-[220px_minmax(0,1fr)]">
+                                    <label className="space-y-1">
+                                      <span className="text-sm font-medium text-slate-700">
+                                        Billable Treatment
+                                      </span>
+                                      <select
+                                        value={selectedTooth.billableTreatmentId}
+                                        onChange={(event) =>
+                                          updateToothField(
+                                            record.id,
+                                            selectedTooth.toothNumber,
+                                            "billableTreatmentId",
+                                            event.target.value,
+                                          )
+                                        }
+                                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-sky-400 focus:bg-white"
+                                      >
+                                        <option value="">Not billable</option>
+                                        {treatmentCatalog.map((item) => (
+                                          <option key={item.id} value={item.id}>
+                                            {item.name} - ${item.defaultPrice} / {item.pricingModel}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </label>
                                     <label className="space-y-1">
                                       <span className="text-sm font-medium text-slate-700">
                                         Tooth Treatment Status
