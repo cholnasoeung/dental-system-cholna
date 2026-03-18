@@ -8,28 +8,28 @@ import { AuthUserPanel } from "@/components/auth-user-panel";
 
 const menuSections = [
   {
-    title: "Core",
+    title: "Workflow",
     items: [
       { label: "Dashboard Overview", href: "/" },
-      { label: "Patient Management", href: "/patients" },
-      { label: "Appointment Management", href: "/appointments" },
-      { label: "Dental Records / EMR", href: "/emr" },
-      { label: "Billing & Payments", href: "/billing" },
+      { label: "1. Patient Registration", href: "/patients" },
+      { label: "2. Appointment Flow", href: "/appointments" },
+      { label: "3. Dentist Availability", href: "/staff" },
+      { label: "4. EMR & Treatment", href: "/emr" },
+      { label: "5. Prescriptions", href: "/prescriptions" },
+      { label: "6. Billing & Payments", href: "/billing" },
+      { label: "7. Reports & Dashboard", href: "/reports" },
     ],
   },
   {
     title: "Operations",
     items: [
-      { label: "Prescription Management", href: "/prescriptions" },
-      { label: "Staff & Role Management", href: "/staff" },
       { label: "Notifications", href: "/notifications" },
-      { label: "Reports & Analytics", href: "/reports" },
+      { label: "Patient Portal", href: "/portal" },
     ],
   },
   {
     title: "Access",
     items: [
-      { label: "Patient Portal", href: "/portal" },
       { label: "Settings", href: "#" },
       { label: "Audit Trail", href: "#" },
     ],
@@ -77,7 +77,7 @@ export function AdminShell({ children }: AdminShellProps) {
                     {section.title}
                   </p>
                   <div className="space-y-2">
-                    {section.items.map((item, index) => {
+                    {section.items.map((item) => {
                       const isActive =
                         item.href !== "#" &&
                         (pathname === item.href ||

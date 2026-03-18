@@ -183,8 +183,8 @@ export default function ReportsPage() {
                 Reports & Analytics
               </h2>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                Review appointments, revenue, outstanding balances, patient growth,
-                dentist workload, and treatment frequency from your live clinic data.
+                This is the final step in the flow chart, where saved visit, billing,
+                and appointment data become dashboard and reporting insights.
               </p>
             </div>
             <div className="grid grid-cols-3 gap-3">

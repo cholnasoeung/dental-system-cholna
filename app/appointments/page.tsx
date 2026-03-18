@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 
 import { AdminShell } from "@/components/admin-shell";
@@ -12,6 +13,7 @@ import {
   type AppointmentFormState,
   type AppointmentStatus,
   type PatientProfile,
+  type StaffMember,
 } from "@/lib/clinic-types";
 
 function formatDateLabel(date: string) {
@@ -32,6 +34,7 @@ export default function AppointmentsPage() {
   );
   const [patients, setPatients] = useState<PatientProfile[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingAppointment, setIsSavingAppointment] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -42,26 +45,29 @@ export default function AppointmentsPage() {
         setIsLoading(true);
         setErrorMessage("");
 
-        const [patientsResponse, appointmentsResponse] = await Promise.all([
+        const [patientsResponse, appointmentsResponse, staffResponse] = await Promise.all([
           fetch("/api/patients", { cache: "no-store" }),
           fetch("/api/appointments", { cache: "no-store" }),
+          fetch("/api/staff", { cache: "no-store" }),
         ]);
 
-        if (!patientsResponse.ok || !appointmentsResponse.ok) {
+        if (!patientsResponse.ok || !appointmentsResponse.ok || !staffResponse.ok) {
           throw new Error(
             `${patientsResponse.ok ? "" : await patientsResponse.text()} ${
               appointmentsResponse.ok ? "" : await appointmentsResponse.text()
-            }`.trim(),
+            } ${staffResponse.ok ? "" : await staffResponse.text()}`.trim(),
           );
         }
 
-        const [patientsData, appointmentsData] = await Promise.all([
+        const [patientsData, appointmentsData, staffData] = await Promise.all([
           (await patientsResponse.json()) as PatientProfile[],
           (await appointmentsResponse.json()) as Appointment[],
+          (await staffResponse.json()) as StaffMember[],
         ]);
 
         setPatients(patientsData);
         setAppointments(appointmentsData);
+        setStaffMembers(staffData);
       } catch (error) {
         console.error(error);
         setErrorMessage(
@@ -171,6 +177,16 @@ export default function AppointmentsPage() {
   const groupedDates = Array.from(new Set(appointments.map((item) => item.date)));
   const reminderCount = appointments.filter((item) => item.reminderDate).length;
   const followUpAppointments = appointments.filter((item) => item.followUpDate);
+  const dentistsFromStaff = staffMembers.filter((member) => member.role === "dentist");
+  const availableDentists = dentistsFromStaff.filter(
+    (member) => member.availabilityStatus === "available",
+  );
+  const confirmedAppointments = appointments.filter(
+    (item) => item.status === "confirmed",
+  );
+  const checkedInAppointments = appointments.filter(
+    (item) => item.status === "checked-in",
+  );
 
   return (
     <AdminShell>
@@ -185,8 +201,9 @@ export default function AppointmentsPage() {
                 Appointment Management
               </h2>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                Book appointments by date, time, and dentist, then track statuses,
-                reminders, follow-up planning, and calendar visibility.
+                This module now follows your appointment flow directly: book the visit,
+                check dentist availability, confirm the booking, mark patient check-in,
+                and schedule the follow-up before the patient leaves.
               </p>
             </div>
             <div className="grid grid-cols-3 gap-3">
@@ -198,18 +215,18 @@ export default function AppointmentsPage() {
               </div>
               <div className="rounded-2xl bg-sky-50 px-4 py-3 ring-1 ring-sky-100">
                 <p className="text-xs uppercase tracking-[0.22em] text-slate-500">
-                  Reminders
+                  Confirmed
                 </p>
                 <p className="mt-2 text-2xl font-semibold text-slate-900">
-                  {reminderCount}
+                  {confirmedAppointments.length}
                 </p>
               </div>
               <div className="rounded-2xl bg-sky-50 px-4 py-3 ring-1 ring-sky-100">
                 <p className="text-xs uppercase tracking-[0.22em] text-slate-500">
-                  Follow-Ups
+                  Checked-In
                 </p>
                 <p className="mt-2 text-2xl font-semibold text-slate-900">
-                  {followUpAppointments.length}
+                  {checkedInAppointments.length}
                 </p>
               </div>
             </div>
@@ -230,7 +247,20 @@ export default function AppointmentsPage() {
 
         <div className="space-y-6">
           <section className="rounded-[28px] border border-white/80 bg-white/85 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
-            <h3 className="text-xl font-semibold text-slate-950">Book Appointment</h3>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <h3 className="text-xl font-semibold text-slate-950">Book Appointment</h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Steps covered here: book appointment, confirm appointment, and patient check-in.
+                </p>
+              </div>
+              <Link
+                href="/staff"
+                className="inline-flex rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+              >
+                Open Dentist Availability
+              </Link>
+            </div>
 
             <form className="mt-6 space-y-5" onSubmit={handleAppointmentSubmit}>
               <label className="space-y-1">
@@ -313,6 +343,50 @@ export default function AppointmentsPage() {
 
           <div className="space-y-6">
             <section className="rounded-[28px] border border-white/80 bg-white/85 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-xl font-semibold text-slate-950">
+                    Dentist Availability Before Confirmation
+                  </h3>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Check this first when choosing a dentist for the appointment.
+                  </p>
+                </div>
+                <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">
+                  {availableDentists.length} available
+                </span>
+              </div>
+
+              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                {(dentistsFromStaff.length === 0 ? dentists.map((name) => ({
+                  id: name,
+                  fullName: name,
+                  availabilityStatus: "available" as const,
+                })) : dentistsFromStaff).map((dentist) => (
+                  <article
+                    key={dentist.id}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                  >
+                    <p className="font-semibold text-slate-900">{dentist.fullName}</p>
+                    <p className="mt-3">
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                          dentist.availabilityStatus === "available"
+                            ? "bg-emerald-100 text-emerald-800"
+                            : dentist.availabilityStatus === "busy"
+                              ? "bg-amber-100 text-amber-800"
+                              : "bg-slate-200 text-slate-700"
+                        }`}
+                      >
+                        {dentist.availabilityStatus}
+                      </span>
+                    </p>
+                  </article>
+                ))}
+              </div>
+            </section>
+
+            <section className="rounded-[28px] border border-white/80 bg-white/85 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-xl font-semibold text-slate-950">Calendar View</h3>
@@ -387,6 +461,70 @@ export default function AppointmentsPage() {
 
             <section className="space-y-6">
               <div className="rounded-[28px] border border-white/80 bg-white/85 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
+                <h3 className="text-xl font-semibold text-slate-950">
+                  Confirmation & Check-In Queue
+                </h3>
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <div className="rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-100">
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                      Ready To Confirm
+                    </p>
+                    <div className="mt-3 space-y-3">
+                      {appointments.filter((appointment) => appointment.status === "scheduled")
+                        .length === 0 ? (
+                        <p className="rounded-2xl bg-white p-4 text-sm text-slate-600 ring-1 ring-slate-200">
+                          No scheduled appointments waiting for confirmation.
+                        </p>
+                      ) : (
+                        appointments
+                          .filter((appointment) => appointment.status === "scheduled")
+                          .map((appointment) => (
+                            <article
+                              key={`${appointment.id}-confirm`}
+                              className="rounded-2xl bg-white p-4 ring-1 ring-slate-200"
+                            >
+                              <p className="font-medium text-slate-900">
+                                {appointment.patientName}
+                              </p>
+                              <p className="mt-1 text-sm text-slate-500">
+                                {formatDateLabel(appointment.date)} at {appointment.time}
+                              </p>
+                            </article>
+                          ))
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-100">
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                      Ready For Check-In
+                    </p>
+                    <div className="mt-3 space-y-3">
+                      {confirmedAppointments.length === 0 ? (
+                        <p className="rounded-2xl bg-white p-4 text-sm text-slate-600 ring-1 ring-slate-200">
+                          No confirmed appointments waiting for patient arrival.
+                        </p>
+                      ) : (
+                        confirmedAppointments.map((appointment) => (
+                          <article
+                            key={`${appointment.id}-checkin`}
+                            className="rounded-2xl bg-white p-4 ring-1 ring-slate-200"
+                          >
+                            <p className="font-medium text-slate-900">
+                              {appointment.patientName}
+                            </p>
+                            <p className="mt-1 text-sm text-slate-500">
+                              {appointment.dentist} | {appointment.time}
+                            </p>
+                          </article>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-[28px] border border-white/80 bg-white/85 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
                 <h3 className="text-xl font-semibold text-slate-950">Reminder Queue</h3>
                 <div className="mt-4 space-y-3">
                   {reminderCount === 0 ? (
@@ -412,7 +550,20 @@ export default function AppointmentsPage() {
               </div>
 
               <div className="rounded-[28px] border border-white/80 bg-slate-950 p-6 text-white shadow-[0_20px_50px_rgba(15,23,42,0.16)]">
-                <h3 className="text-xl font-semibold">Follow-Up Schedule</h3>
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                  <div>
+                    <h3 className="text-xl font-semibold">Follow-Up Schedule</h3>
+                    <p className="mt-1 text-sm text-slate-300">
+                      Final appointment step before handing the visit off to reporting.
+                    </p>
+                  </div>
+                  <Link
+                    href="/reports"
+                    className="inline-flex rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-slate-100"
+                  >
+                    Open Reports Dashboard
+                  </Link>
+                </div>
                 <div className="mt-4 space-y-3">
                   {followUpAppointments.length === 0 ? (
                     <p className="rounded-2xl bg-white/10 p-4 text-sm text-slate-300">

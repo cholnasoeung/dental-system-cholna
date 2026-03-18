@@ -197,8 +197,8 @@ export default function PrescriptionsPage() {
                 Prescription Management
               </h2>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                Create prescriptions, link them to visits or treatments, print them,
-                and review medication history across patients.
+                This step comes after examination and treatment planning when the
+                dentist needs to issue medication linked to the visit.
               </p>
             </div>
             <div className="grid grid-cols-3 gap-3">

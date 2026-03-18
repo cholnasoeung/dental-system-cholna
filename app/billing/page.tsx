@@ -215,8 +215,8 @@ export default function BillingPage() {
                 Billing & Payments
               </h2>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                Generate invoices, add treatment charges, accept partial or full
-                payments, monitor outstanding balances, and review billing history.
+                This module handles the late-stage flow: generate invoice, record
+                payment, and complete the visit before follow-up scheduling and reporting.
               </p>
             </div>
             <div className="grid grid-cols-3 gap-3">
@@ -260,7 +260,12 @@ export default function BillingPage() {
 
         <div className="space-y-6">
           <section className="rounded-[28px] border border-white/80 bg-white/85 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
-            <h3 className="text-xl font-semibold text-slate-950">Generate Invoice</h3>
+            <div>
+              <h3 className="text-xl font-semibold text-slate-950">Generate Invoice</h3>
+              <p className="mt-1 text-sm text-slate-500">
+                Add treatment charges first, then record the payment in the same workflow.
+              </p>
+            </div>
 
             <form className="mt-6 space-y-6" onSubmit={handleSubmit}>
               <div className="grid gap-4 md:grid-cols-2">

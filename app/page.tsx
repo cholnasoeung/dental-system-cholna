@@ -7,27 +7,27 @@ import { LiveOperationsPreview } from "@/components/live-operations-preview";
 
 const primaryModules = [
   {
-    title: "Patient Management",
+    title: "Patient Registration",
     description:
-      "Register patients, manage records, and keep every profile ready for reception and clinical teams.",
+      "Start the visit by registering the patient or finding the existing record immediately.",
     href: "/patients",
-    eyebrow: "Front Desk",
+    eyebrow: "Step 1",
     accent: "from-cyan-400/30 via-sky-300/20 to-white",
   },
   {
-    title: "Appointment Management",
+    title: "Appointment Flow",
     description:
-      "Coordinate bookings, reminders, and follow-ups with a calendar flow tuned for real clinic pressure.",
+      "Book, confirm, check in, and schedule follow-ups from one appointment queue.",
     href: "/appointments",
-    eyebrow: "Scheduling",
+    eyebrow: "Steps 2, 5, 6, 15",
     accent: "from-amber-300/30 via-orange-200/20 to-white",
   },
   {
-    title: "Dental Records / EMR",
+    title: "Clinical EMR",
     description:
-      "Capture odontograms, treatment steps, diagnoses, and clinical findings in one visual record flow.",
+      "Open the patient chart, review history, diagnose, plan treatment, and update tooth notes.",
     href: "/emr",
-    eyebrow: "Clinical",
+    eyebrow: "Steps 7-11, 16",
     accent: "from-emerald-300/30 via-teal-200/20 to-white",
   },
 ];
@@ -35,27 +35,27 @@ const primaryModules = [
 const supportingModules = [
   {
     title: "Billing & Payments",
-    description: "Track invoices, collections, and outstanding balances clearly.",
+    description: "Generate invoices and record patient payments before checkout.",
     href: "/billing",
   },
   {
     title: "Prescription Management",
-    description: "Create prescriptions connected to treatment context.",
+    description: "Issue medications directly from the treatment workflow.",
     href: "/prescriptions",
   },
   {
     title: "Notifications",
-    description: "Handle reminders, confirmations, and follow-up messaging.",
+    description: "Support confirmations, reminders, and follow-up outreach.",
     href: "/notifications",
   },
   {
     title: "Reports & Analytics",
-    description: "Review growth, revenue, workload, and care activity.",
+    description: "Finish the cycle with operational and financial reporting.",
     href: "/reports",
   },
   {
     title: "Staff & Role Management",
-    description: "Manage team access, permissions, schedules, and availability.",
+    description: "Track dentist schedules and availability before confirming appointments.",
     href: "/staff",
   },
   {
@@ -68,8 +68,8 @@ const supportingModules = [
 const highlights = [
   "Real-time operations preview",
   "AI-ready clinic insights",
+  "Flow-chart based clinic journey",
   "Built-in analytics tracking",
-  "SEO and social metadata support",
 ];
 
 export const metadata: Metadata = {
@@ -96,12 +96,12 @@ export default function Home() {
                 DentalFlow Platform
               </p>
               <h1 className="mt-4 max-w-4xl text-4xl font-semibold tracking-tight text-white md:text-5xl">
-                A cleaner, smarter operating system for modern dental clinics.
+                A dental management system organized around the real clinic journey.
               </h1>
               <p className="mt-4 max-w-3xl text-base leading-7 text-slate-200">
-                Manage patients, appointments, billing, prescriptions, staff access,
-                and treatment progress from one calm workspace designed for real
-                daily operations.
+                The workflow now follows your chart from patient arrival and registration,
+                through appointment confirmation, check-in, EMR, prescription, billing,
+                payment, follow-up, and reporting.
               </p>
 
               <div className="mt-8 flex flex-wrap gap-3">
@@ -109,7 +109,7 @@ export default function Home() {
                   href="/patients"
                   className="rounded-full bg-cyan-300 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200"
                 >
-                  Open Patient Hub
+                  Start At Registration
                 </Link>
                 <Link
                   href="/reports"
@@ -143,7 +143,7 @@ export default function Home() {
                   Main Workflows
                 </p>
                 <h2 className="mt-2 text-2xl font-semibold text-slate-950">
-                  Start with the highest-velocity parts of the clinic
+                  Open the main stages of the clinic flow
                 </h2>
               </div>
               <span className="rounded-full bg-sky-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-sky-700 ring-1 ring-sky-100">
@@ -191,9 +191,8 @@ export default function Home() {
               </h2>
             </div>
             <p className="max-w-2xl text-sm leading-6 text-slate-600">
-              The product now includes better SEO metadata, analytics capture,
-              AI-ready insight sections, and a live operations preview without
-              losing the focused admin workflow.
+              Supporting modules now sit around the same end-to-end patient flow so
+              reception, clinical, and billing teams can move through one sequence.
             </p>
           </div>
 

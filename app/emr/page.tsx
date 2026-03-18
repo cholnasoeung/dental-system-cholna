@@ -398,9 +398,9 @@ export default function EmrPage() {
                 Dental Records / EMR
               </h2>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                Record odontogram findings, consultation notes, diagnoses,
-                treatment plans, procedure history, and clinical attachments for
-                each patient visit.
+                This is the clinical section of your flow: dentist opens the record,
+                reviews history, performs examination and diagnosis, creates the
+                treatment plan, updates the tooth chart and notes, and saves the visit.
               </p>
             </div>
             <div className="grid grid-cols-3 gap-3">
@@ -444,7 +444,12 @@ export default function EmrPage() {
 
         <div className="space-y-6">
           <section className="rounded-[28px] border border-white/80 bg-white/85 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
-            <h3 className="text-xl font-semibold text-slate-950">Create EMR Entry</h3>
+            <div>
+              <h3 className="text-xl font-semibold text-slate-950">Create EMR Entry</h3>
+              <p className="mt-1 text-sm text-slate-500">
+                Use this form for review history, diagnosis, treatment planning, tooth chart updates, and save-to-system.
+              </p>
+            </div>
 
             <form className="mt-6 space-y-6" onSubmit={handleSubmit}>
               <div className="grid gap-4 md:grid-cols-2">

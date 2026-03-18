@@ -29,6 +29,7 @@ export type PatientFormState = Omit<PatientProfile, "id" | "documents" | "xrays"
 export type AppointmentStatus =
   | "scheduled"
   | "confirmed"
+  | "checked-in"
   | "completed"
   | "canceled"
   | "no-show";
@@ -231,6 +232,7 @@ export const dentists = ["Dr. Lina", "Dr. Sreypov", "Dr. Dara", "Dr. Michael"];
 export const statusOptions: AppointmentStatus[] = [
   "scheduled",
   "confirmed",
+  "checked-in",
   "completed",
   "canceled",
   "no-show",
@@ -239,6 +241,7 @@ export const statusOptions: AppointmentStatus[] = [
 export const statusStyles: Record<AppointmentStatus, string> = {
   scheduled: "bg-amber-100 text-amber-800",
   confirmed: "bg-sky-100 text-sky-800",
+  "checked-in": "bg-violet-100 text-violet-800",
   completed: "bg-emerald-100 text-emerald-800",
   canceled: "bg-rose-100 text-rose-800",
   "no-show": "bg-slate-200 text-slate-700",

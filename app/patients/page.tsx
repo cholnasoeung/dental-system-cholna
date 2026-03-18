@@ -241,8 +241,9 @@ export default function PatientsPage() {
                 Patient Management
               </h2>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                Create patient profiles with demographics, emergency contacts,
-                medical history, insurance details, and uploaded documents or X-rays.
+                This module covers the first flow-chart stage: patient arrives or
+                registers, then the team creates or finds the patient record before
+                moving on to appointment booking.
               </p>
             </div>
             <div className="grid grid-cols-3 gap-3">
@@ -389,6 +390,22 @@ export default function PatientsPage() {
                     : "Save Patient Profile"}
               </button>
             </form>
+
+            <div className="mt-6 rounded-3xl border border-sky-100 bg-sky-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">
+                Next Step
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-700">
+                After the patient record is ready, continue to appointment booking,
+                dentist availability, confirmation, and check-in.
+              </p>
+              <Link
+                href="/appointments"
+                className="mt-4 inline-flex rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+              >
+                Continue To Appointment Flow
+              </Link>
+            </div>
           </section>
 
           <aside className="space-y-6">

@@ -149,8 +149,8 @@ export default function StaffPage() {
                 Staff & Role Management
               </h2>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                Add staff members, assign roles and permissions, manage work
-                schedules, and track dentist availability.
+                This module supports the appointment flow by showing dentist
+                availability before the appointment is confirmed.
               </p>
             </div>
             <div className="grid grid-cols-3 gap-3">
