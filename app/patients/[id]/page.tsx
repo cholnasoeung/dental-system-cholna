@@ -106,6 +106,28 @@ function getTreatmentStatusClass(status: TreatmentStatus) {
   }
 }
 
+function getToothTreatmentStatusClass(status: TreatmentStatus) {
+  switch (status) {
+    case "planned":
+      return "border-amber-200 bg-amber-50 text-amber-700";
+    case "in-progress":
+      return "border-sky-200 bg-sky-50 text-sky-700";
+    case "completed":
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    default:
+      return "border-slate-200 bg-slate-50 text-slate-600";
+  }
+}
+
+function normalizeTooth(tooth: OdontogramTooth): OdontogramTooth {
+  return {
+    ...tooth,
+    notes: tooth.notes ?? "",
+    treatmentProcess: tooth.treatmentProcess ?? "",
+    treatmentStatus: tooth.treatmentStatus ?? "planned",
+  };
+}
+
 function ToothIllustration({
   toothNumber,
   condition,
@@ -309,6 +331,7 @@ export default function PatientDetailPage() {
           ...record,
           treatmentStep: record.treatmentStep ?? "",
           treatmentStatus: record.treatmentStatus ?? "planned",
+          odontogram: record.odontogram.map((tooth) => normalizeTooth(tooth)),
         }));
 
         setPatient(patientData);
@@ -350,7 +373,7 @@ export default function PatientDetailPage() {
   function updateToothField(
     recordId: string,
     toothNumber: string,
-    field: "condition" | "notes",
+    field: "condition" | "notes" | "treatmentProcess" | "treatmentStatus",
     value: string,
   ) {
     setRecords((current) =>
@@ -583,8 +606,11 @@ export default function PatientDetailPage() {
                     );
                     const selectedToothNumber =
                       selectedToothNumbers[record.id] ?? record.odontogram[0]?.toothNumber ?? "11";
-                    const selectedTooth =
+                    const selectedToothSource =
                       toothLookup.get(selectedToothNumber) ?? record.odontogram[0];
+                    const selectedTooth = selectedToothSource
+                      ? normalizeTooth(selectedToothSource)
+                      : null;
 
                     return (
                       <article
@@ -826,6 +852,13 @@ export default function PatientDetailPage() {
                                   >
                                     {selectedTooth.condition.replace("-", " ")}
                                   </span>
+                                  <span
+                                    className={`mt-2 inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getToothTreatmentStatusClass(
+                                      selectedTooth.treatmentStatus,
+                                    )}`}
+                                  >
+                                    {(selectedTooth.treatmentStatus ?? "planned").replace("-", " ")}
+                                  </span>
                                 </div>
                                 <div className="rounded-3xl bg-white p-4 ring-1 ring-slate-200">
                                   <div className="grid gap-4 md:grid-cols-[220px_minmax(0,1fr)]">
@@ -867,6 +900,50 @@ export default function PatientDetailPage() {
                                           )
                                         }
                                         placeholder="Sensitivity, temporary crown, next review step..."
+                                        className="min-h-28 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-sky-400 focus:bg-white"
+                                      />
+                                    </label>
+                                  </div>
+
+                                  <div className="mt-4 grid gap-4 md:grid-cols-[220px_minmax(0,1fr)]">
+                                    <label className="space-y-1">
+                                      <span className="text-sm font-medium text-slate-700">
+                                        Tooth Treatment Status
+                                      </span>
+                                      <select
+                                        value={selectedTooth.treatmentStatus ?? "planned"}
+                                        onChange={(event) =>
+                                          updateToothField(
+                                            record.id,
+                                            selectedTooth.toothNumber,
+                                            "treatmentStatus",
+                                            event.target.value,
+                                          )
+                                        }
+                                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-sky-400 focus:bg-white"
+                                      >
+                                        {treatmentStatusOptions.map((status) => (
+                                          <option key={status} value={status}>
+                                            {status.replace("-", " ")}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </label>
+                                    <label className="space-y-1">
+                                      <span className="text-sm font-medium text-slate-700">
+                                        Tooth Treatment Process
+                                      </span>
+                                      <textarea
+                                        value={selectedTooth.treatmentProcess ?? ""}
+                                        onChange={(event) =>
+                                          updateToothField(
+                                            record.id,
+                                            selectedTooth.toothNumber,
+                                            "treatmentProcess",
+                                            event.target.value,
+                                          )
+                                        }
+                                        placeholder="Decay removed, medicament placed, review after one week..."
                                         className="min-h-28 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-sky-400 focus:bg-white"
                                       />
                                     </label>

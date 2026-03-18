@@ -23,7 +23,13 @@ function serializeDentalRecord(
     treatmentStatus: record.treatmentStatus ?? "planned",
     procedureHistory: record.procedureHistory,
     clinicalAttachments: record.clinicalAttachments ?? [],
-    odontogram: record.odontogram ?? [],
+    odontogram: (record.odontogram ?? []).map((tooth) => ({
+      toothNumber: tooth.toothNumber,
+      condition: tooth.condition,
+      notes: tooth.notes ?? "",
+      treatmentProcess: tooth.treatmentProcess ?? "",
+      treatmentStatus: tooth.treatmentStatus ?? "planned",
+    })),
   };
 }
 

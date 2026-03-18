@@ -14,6 +14,7 @@ import {
   type OdontogramTooth,
   type PatientProfile,
   type ToothCondition,
+  type TreatmentStatus,
 } from "@/lib/clinic-types";
 
 const upperLeftTeeth = ["18", "17", "16", "15", "14", "13", "12", "11"];
@@ -60,6 +61,28 @@ function getConditionBadge(condition: ToothCondition) {
     default:
       return "border-slate-200 bg-slate-50 text-slate-600";
   }
+}
+
+function getToothTreatmentBadge(status: TreatmentStatus) {
+  switch (status) {
+    case "planned":
+      return "border-amber-200 bg-amber-50 text-amber-700";
+    case "in-progress":
+      return "border-sky-200 bg-sky-50 text-sky-700";
+    case "completed":
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    default:
+      return "border-slate-200 bg-slate-50 text-slate-600";
+  }
+}
+
+function normalizeTooth(tooth: OdontogramTooth): OdontogramTooth {
+  return {
+    ...tooth,
+    notes: tooth.notes ?? "",
+    treatmentProcess: tooth.treatmentProcess ?? "",
+    treatmentStatus: tooth.treatmentStatus ?? "planned",
+  };
 }
 
 function ToothIllustration({
@@ -254,6 +277,8 @@ export default function EmrPage() {
       toothNumber,
       condition: "healthy",
       notes: "",
+      treatmentProcess: "",
+      treatmentStatus: "planned",
     })),
   );
   const [selectedToothNumber, setSelectedToothNumber] = useState("11");
@@ -310,7 +335,7 @@ export default function EmrPage() {
 
   function handleToothChange(
     toothNumber: string,
-    field: "condition" | "notes",
+    field: "condition" | "notes" | "treatmentProcess" | "treatmentStatus",
     value: string,
   ) {
     setOdontogram((current) =>
@@ -361,6 +386,8 @@ export default function EmrPage() {
           toothNumber,
           condition: "healthy",
           notes: "",
+          treatmentProcess: "",
+          treatmentStatus: "planned",
         })),
       );
       form.reset();
@@ -382,8 +409,9 @@ export default function EmrPage() {
   const toothLookup = new Map(
     odontogram.map((tooth) => [tooth.toothNumber, tooth] as const),
   );
-  const selectedTooth =
-    toothLookup.get(selectedToothNumber) ?? toothLookup.get("11") ?? odontogram[0];
+  const selectedTooth = normalizeTooth(
+    toothLookup.get(selectedToothNumber) ?? toothLookup.get("11") ?? odontogram[0],
+  );
 
   return (
     <AdminShell>
@@ -650,6 +678,13 @@ export default function EmrPage() {
                           >
                             {selectedTooth.condition.replace("-", " ")}
                           </span>
+                          <span
+                            className={`mt-2 inline-flex rounded-full border px-3 py-1 text-xs font-semibold capitalize ${getToothTreatmentBadge(
+                              selectedTooth.treatmentStatus,
+                            )}`}
+                          >
+                            {(selectedTooth.treatmentStatus ?? "planned").replace("-", " ")}
+                          </span>
                         </div>
 
                         <div className="mt-4 rounded-3xl bg-slate-50 p-4">
@@ -704,6 +739,49 @@ export default function EmrPage() {
                                 )
                               }
                               placeholder="Mobility, percussion pain, fracture line, restoration margin..."
+                              className="min-h-28 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white"
+                            />
+                          </label>
+                        </div>
+
+                        <div className="mt-4 grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
+                          <label className="space-y-1">
+                            <span className="text-sm font-medium text-slate-700">
+                              Tooth Treatment Status
+                            </span>
+                            <select
+                              value={selectedTooth.treatmentStatus ?? "planned"}
+                              onChange={(event) =>
+                                handleToothChange(
+                                  selectedTooth.toothNumber,
+                                  "treatmentStatus",
+                                  event.target.value,
+                                )
+                              }
+                              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white"
+                            >
+                              {treatmentStatusOptions.map((status) => (
+                                <option key={status} value={status}>
+                                  {status.replace("-", " ")}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+
+                          <label className="space-y-1">
+                            <span className="text-sm font-medium text-slate-700">
+                              Tooth Treatment Process
+                            </span>
+                            <textarea
+                              value={selectedTooth.treatmentProcess ?? ""}
+                              onChange={(event) =>
+                                handleToothChange(
+                                  selectedTooth.toothNumber,
+                                  "treatmentProcess",
+                                  event.target.value,
+                                )
+                              }
+                              placeholder="Etching done, temporary filling placed, next visit for crown fitting..."
                               className="min-h-28 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white"
                             />
                           </label>

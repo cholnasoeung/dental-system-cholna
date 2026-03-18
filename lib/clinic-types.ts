@@ -79,6 +79,8 @@ export type OdontogramTooth = {
   toothNumber: string;
   condition: ToothCondition;
   notes: string;
+  treatmentProcess: string;
+  treatmentStatus: TreatmentStatus;
 };
 
 export type ClinicalAttachment = {
