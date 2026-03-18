@@ -16,6 +16,17 @@ function errorResponse(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
 }
 
+function getLoginErrorMessage(error: unknown) {
+  if (
+    error instanceof Error &&
+    (error.message.includes("MongoDB") || error.message.includes("MONGODB_URI"))
+  ) {
+    return "Unable to reach the database. Please check the database connection and try again.";
+  }
+
+  return "Login failed.";
+}
+
 export async function POST(request: Request) {
   try {
     const { email, password } = (await request.json()) as {
@@ -57,6 +68,6 @@ export async function POST(request: Request) {
     return response;
   } catch (error) {
     console.error("POST /api/auth/login failed", error);
-    return errorResponse("Login failed.", 500);
+    return errorResponse(getLoginErrorMessage(error), 500);
   }
 }

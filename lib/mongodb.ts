@@ -1,21 +1,29 @@
 import { MongoClient } from "mongodb";
 
-const uri = process.env.MONGODB_URI;
-
-if (!uri) {
-  throw new Error("MONGODB_URI is not configured.");
-}
-
-const mongoUri = uri;
-
 declare global {
   var _mongoClientPromise: Promise<MongoClient> | undefined;
 }
 
+function getMongoUri() {
+  const uri = process.env.MONGODB_URI;
+
+  if (!uri) {
+    throw new Error("MONGODB_URI is not configured.");
+  }
+
+  return uri;
+}
+
 function getClientPromise() {
   if (!global._mongoClientPromise) {
-    const client = new MongoClient(mongoUri);
-    global._mongoClientPromise = client.connect();
+    const client = new MongoClient(getMongoUri(), {
+      appName: "dental-management-system",
+      serverSelectionTimeoutMS: 10_000,
+    });
+    global._mongoClientPromise = client.connect().catch((error) => {
+      global._mongoClientPromise = undefined;
+      throw new Error("Unable to connect to MongoDB.", { cause: error });
+    });
   }
 
   return global._mongoClientPromise;

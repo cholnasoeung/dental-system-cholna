@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 
 import { AppAnalytics } from "@/components/app-analytics";
@@ -63,7 +64,9 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <AppAnalytics />
+        <Suspense fallback={null}>
+          <AppAnalytics />
+        </Suspense>
         {children}
       </body>
     </html>
