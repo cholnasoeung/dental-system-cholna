@@ -97,7 +97,7 @@ function ToothIllustration({
   isLower: boolean;
 }) {
   const toothType = getToothType(toothNumber);
-  const outlineClass = isSelected
+  const toneClass = isSelected
     ? "text-sky-600"
     : condition === "healthy"
       ? "text-slate-500"
@@ -113,48 +113,80 @@ function ToothIllustration({
                 ? "text-violet-500"
                 : "text-slate-400";
 
+  const toothShape =
+    toothType === "molar"
+      ? "M13 25C13 15 18 9 23 9c4 0 6 2 7 5 1-3 3-5 7-5 5 0 10 6 10 16 0 11-2 20-5 27-3 7-5 14-6 28H24c-1-14-3-21-6-28-3-7-5-16-5-27Z"
+      : toothType === "premolar"
+        ? "M18 21c1-8 5-13 12-13s11 5 12 13c1 10-1 20-4 27-3 7-5 15-6 29h-4c-1-14-3-22-6-29-3-7-5-17-4-27Z"
+        : toothType === "canine"
+          ? "M24 15c2-6 4-9 6-9s4 3 6 9c3 9 3 18 1 26-2 8-4 18-5 35h-4c-1-17-3-27-5-35-2-8-2-17 1-26Z"
+          : "M21 15c2-5 5-7 9-7s7 2 9 7c2 8 2 17 0 24-2 10-4 21-5 37h-8c-1-16-3-27-5-37-2-7-2-16 0-24Z";
+
   return (
     <div className="relative flex h-16 items-center justify-center md:h-20">
       <svg
         viewBox="0 0 60 104"
-        className={`h-14 w-8 md:h-16 md:w-10 ${outlineClass} ${isLower ? "rotate-180" : ""}`}
+        className={`h-14 w-8 drop-shadow-[0_3px_6px_rgba(148,163,184,0.18)] md:h-[4.4rem] md:w-11 ${toneClass} ${isLower ? "rotate-180" : ""}`}
         fill="none"
         stroke="currentColor"
-        strokeWidth="1.6"
+        strokeWidth="1.5"
         strokeLinecap="round"
         strokeLinejoin="round"
         aria-hidden="true"
       >
-        {toothType === "molar" ? (
-          <path d="M12 23C14 12 19 8 24 8c3 0 5 2 6 5 1-3 3-5 6-5 5 0 10 4 12 15 3 18 1 31-4 39-4 7-5 15-6 29H24c-1-14-2-22-6-29-5-8-7-21-6-39Z" />
-        ) : null}
-        {toothType === "premolar" ? (
-          <path d="M18 18c2-8 6-12 12-12s10 4 12 12c4 17 3 32-2 41-5 9-7 18-8 32h-4c-1-14-3-23-8-32-5-9-6-24-2-41Z" />
-        ) : null}
-        {toothType === "canine" ? (
-          <path d="M24 11c2-5 4-7 6-7s4 2 6 7c5 16 5 35 1 47-4 13-6 22-7 33h-2c-1-11-3-20-7-33-4-12-4-31 1-47Z" />
-        ) : null}
-        {toothType === "incisor" ? (
-          <path d="M21 10c2-4 5-6 9-6s7 2 9 6c3 10 4 27 1 43-3 14-5 24-6 38h-8c-1-14-3-24-6-38-3-16-2-33 1-43Z" />
-        ) : null}
+        <defs>
+          <linearGradient id={`tooth-fill-${toothNumber}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#ffffff" />
+            <stop offset="52%" stopColor="#f8fbff" />
+            <stop offset="100%" stopColor="#e5eef9" />
+          </linearGradient>
+          <linearGradient id={`tooth-shade-${toothNumber}`} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="rgba(255,255,255,0.92)" />
+            <stop offset="100%" stopColor="rgba(203,213,225,0.38)" />
+          </linearGradient>
+        </defs>
+
+        <path d={toothShape} fill={`url(#tooth-fill-${toothNumber})`} />
+        <path d={toothShape} className="opacity-95" />
+        <path
+          d={toothShape}
+          fill={`url(#tooth-shade-${toothNumber})`}
+          stroke="none"
+          className="opacity-50"
+        />
+        <path d="M24 18c2 4 4 6 6 6s4-2 6-6" className="opacity-35" />
+        <path d="M30 24v48" className="opacity-22" />
 
         {condition === "filling" ? (
-          <path d="M21 29h18M20 36h20" className="text-sky-500" />
+          <>
+            <path d="M21 33h18" className="text-sky-500" strokeWidth="2.2" />
+            <path d="M22 38h16" className="text-sky-400" strokeWidth="2.2" />
+          </>
         ) : null}
         {condition === "crown" ? (
-          <path d="M17 20c4 4 8 6 13 6s9-2 13-6" className="text-amber-500" />
+          <path
+            d="M18 24c4 3 8 5 12 5s8-2 12-5"
+            className="text-amber-500"
+            strokeWidth="2.2"
+          />
         ) : null}
         {condition === "root-canal" ? (
-          <path d="M30 28v44" className="text-violet-500" />
+          <>
+            <path d="M30 28v43" className="text-violet-500" strokeWidth="2.2" />
+            <path d="M25 50h10" className="text-violet-400" strokeWidth="1.8" />
+          </>
         ) : null}
         {condition === "caries" ? (
-          <circle cx="30" cy="35" r="5" className="fill-rose-500 stroke-rose-500" />
+          <>
+            <circle cx="30" cy="35" r="5.5" className="fill-rose-500/90 stroke-rose-500" />
+            <circle cx="28.5" cy="33.8" r="1.4" className="fill-rose-200 stroke-none" />
+          </>
         ) : null}
       </svg>
 
       {condition === "missing" ? (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <svg viewBox="0 0 100 100" className="h-14 w-8 text-rose-600 md:h-16 md:w-10">
+          <svg viewBox="0 0 100 100" className="h-14 w-8 text-rose-600 md:h-[4.4rem] md:w-11">
             <path
               d="M18 14 82 86M82 14 18 86"
               stroke="currentColor"
@@ -167,13 +199,10 @@ function ToothIllustration({
 
       {condition === "implant" ? (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <svg viewBox="0 0 100 100" className="h-14 w-8 text-emerald-500 md:h-16 md:w-10">
-            <path
-              d="M28 16 72 84M72 16 28 84"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-            />
+          <svg viewBox="0 0 100 100" className="h-14 w-8 text-emerald-500 md:h-[4.4rem] md:w-11">
+            <path d="M50 18v50" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+            <path d="M40 33h20M40 43h20M40 53h20" stroke="currentColor" strokeWidth="2.8" />
+            <path d="M37 72c6-4 20-4 26 0" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
           </svg>
         </div>
       ) : null}
@@ -219,10 +248,10 @@ function OdontogramRow({
               key={toothNumber}
               type="button"
               onClick={() => onSelectTooth(toothNumber)}
-              className={`rounded-[18px] border px-1 py-1.5 transition md:rounded-[22px] md:px-1.5 md:py-2 ${
+              className={`rounded-[20px] border px-1 py-2 transition md:rounded-[24px] md:px-1.5 md:py-2.5 ${
                 isSelected
-                  ? "border-sky-300 bg-sky-50 shadow-[0_14px_30px_rgba(14,165,233,0.14)]"
-                  : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                  ? "border-sky-300 bg-[linear-gradient(180deg,#eff9ff_0%,#dff2ff_100%)] shadow-[0_16px_34px_rgba(14,165,233,0.16)]"
+                  : "border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] hover:border-slate-300 hover:bg-slate-50 hover:shadow-[0_12px_24px_rgba(148,163,184,0.10)]"
               }`}
             >
               <ToothIllustration
