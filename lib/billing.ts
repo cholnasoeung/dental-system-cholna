@@ -20,15 +20,25 @@ function fallbackInvoiceNumber(record: DentalRecord) {
 }
 
 function groupBillableTeeth(record: DentalRecord) {
-  return record.odontogram.reduce<Record<string, string[]>>((acc, tooth) => {
+  return record.odontogram.reduce<Record<string, { toothNumbers: string[]; unitPrice: number | null }[]>>((acc, tooth) => {
     if (!tooth.billableTreatmentId) {
       return acc;
     }
 
-    acc[tooth.billableTreatmentId] = [
-      ...(acc[tooth.billableTreatmentId] ?? []),
-      tooth.toothNumber,
-    ];
+    const groups = [...(acc[tooth.billableTreatmentId] ?? [])];
+    const unitPrice = tooth.billableUnitPrice ?? null;
+    const existingGroup = groups.find((group) => group.unitPrice === unitPrice);
+
+    if (existingGroup) {
+      existingGroup.toothNumbers.push(tooth.toothNumber);
+    } else {
+      groups.push({
+        toothNumbers: [tooth.toothNumber],
+        unitPrice,
+      });
+    }
+
+    acc[tooth.billableTreatmentId] = groups;
     return acc;
   }, {});
 }
@@ -37,12 +47,13 @@ function buildLineItem(
   catalogItem: TreatmentCatalogItem,
   toothNumbers: string[],
   linkedRecordId: string,
+  unitPriceOverride: number | null,
 ): InvoiceLine {
   return {
     treatmentId: catalogItem.id,
     treatment: catalogItem.name,
     quantity: catalogItem.pricingModel === "per-case" ? 1 : toothNumbers.length,
-    unitPrice: catalogItem.defaultPrice,
+    unitPrice: unitPriceOverride ?? catalogItem.defaultPrice,
     pricingModel: catalogItem.pricingModel,
     linkedRecordId,
     toothNumbers,
@@ -54,13 +65,23 @@ export function deriveInvoiceLineItems(record: DentalRecord): InvoiceLine[] {
   const groupedTeeth = groupBillableTeeth(record);
 
   return treatmentCatalog.flatMap((catalogItem) => {
-    const toothNumbers = groupedTeeth[catalogItem.id] ?? [];
+    const groupedEntries = groupedTeeth[catalogItem.id] ?? [];
 
-    if (toothNumbers.length === 0) {
+    if (groupedEntries.length === 0) {
       return [];
     }
 
-    return [buildLineItem(catalogItem, toothNumbers, record.id)];
+    if (catalogItem.pricingModel === "per-case") {
+      const mergedToothNumbers = groupedEntries.flatMap((entry) => entry.toothNumbers);
+      const unitPriceOverride =
+        groupedEntries.find((entry) => entry.unitPrice !== null)?.unitPrice ?? null;
+
+      return [buildLineItem(catalogItem, mergedToothNumbers, record.id, unitPriceOverride)];
+    }
+
+    return groupedEntries.map((entry) =>
+      buildLineItem(catalogItem, entry.toothNumbers, record.id, entry.unitPrice),
+    );
   });
 }
 

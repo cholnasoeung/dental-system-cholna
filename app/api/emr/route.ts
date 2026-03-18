@@ -31,6 +31,7 @@ function serializeDentalRecord(
       treatmentProcess: tooth.treatmentProcess ?? "",
       treatmentStatus: tooth.treatmentStatus ?? "planned",
       billableTreatmentId: tooth.billableTreatmentId ?? "",
+      billableUnitPrice: tooth.billableUnitPrice ?? null,
     })),
   };
 }

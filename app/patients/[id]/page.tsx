@@ -127,6 +127,7 @@ function normalizeTooth(tooth: OdontogramTooth): OdontogramTooth {
     treatmentProcess: tooth.treatmentProcess ?? "",
     treatmentStatus: tooth.treatmentStatus ?? "planned",
     billableTreatmentId: tooth.billableTreatmentId ?? "",
+    billableUnitPrice: tooth.billableUnitPrice ?? null,
   };
 }
 
@@ -409,7 +410,8 @@ export default function PatientDetailPage() {
       | "notes"
       | "treatmentProcess"
       | "treatmentStatus"
-      | "billableTreatmentId",
+      | "billableTreatmentId"
+      | "billableUnitPrice",
     value: string,
   ) {
     setRecords((current) =>
@@ -422,7 +424,13 @@ export default function PatientDetailPage() {
                   ? {
                       ...tooth,
                       [field]:
-                        field === "condition" ? (value as ToothCondition) : value,
+                        field === "condition"
+                          ? (value as ToothCondition)
+                          : field === "billableUnitPrice"
+                            ? value === ""
+                              ? null
+                              : Number(value)
+                            : value,
                     }
                   : tooth,
               ),
@@ -955,12 +963,26 @@ export default function PatientDetailPage() {
                                       <select
                                         value={selectedTooth.billableTreatmentId}
                                         onChange={(event) =>
-                                          updateToothField(
-                                            record.id,
-                                            selectedTooth.toothNumber,
-                                            "billableTreatmentId",
-                                            event.target.value,
-                                          )
+                                          {
+                                            const nextTreatmentId = event.target.value;
+                                            const catalogItem = treatmentCatalog.find(
+                                              (item) => item.id === nextTreatmentId,
+                                            );
+                                            updateToothField(
+                                              record.id,
+                                              selectedTooth.toothNumber,
+                                              "billableTreatmentId",
+                                              nextTreatmentId,
+                                            );
+                                            updateToothField(
+                                              record.id,
+                                              selectedTooth.toothNumber,
+                                              "billableUnitPrice",
+                                              nextTreatmentId
+                                                ? String(catalogItem?.defaultPrice ?? "")
+                                                : "",
+                                            );
+                                          }
                                         }
                                         className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-sky-400 focus:bg-white"
                                       >
@@ -972,6 +994,39 @@ export default function PatientDetailPage() {
                                         ))}
                                       </select>
                                     </label>
+                                    <label className="space-y-1">
+                                      <span className="text-sm font-medium text-slate-700">
+                                        Tooth Price
+                                      </span>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={selectedTooth.billableUnitPrice ?? ""}
+                                        onChange={(event) =>
+                                          updateToothField(
+                                            record.id,
+                                            selectedTooth.toothNumber,
+                                            "billableUnitPrice",
+                                            event.target.value,
+                                          )
+                                        }
+                                        placeholder={
+                                          selectedTooth.billableTreatmentId
+                                            ? String(
+                                                treatmentCatalog.find(
+                                                  (item) =>
+                                                    item.id === selectedTooth.billableTreatmentId,
+                                                )?.defaultPrice ?? "",
+                                              )
+                                            : "No price"
+                                        }
+                                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-sky-400 focus:bg-white"
+                                      />
+                                    </label>
+                                  </div>
+
+                                  <div className="mt-4 grid gap-4 md:grid-cols-[220px_minmax(0,1fr)]">
                                     <label className="space-y-1">
                                       <span className="text-sm font-medium text-slate-700">
                                         Tooth Treatment Status

@@ -91,6 +91,7 @@ export type OdontogramTooth = {
   treatmentProcess: string;
   treatmentStatus: TreatmentStatus;
   billableTreatmentId: string;
+  billableUnitPrice: number | null;
 };
 
 export type ClinicalAttachment = {

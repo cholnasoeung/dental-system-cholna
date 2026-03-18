@@ -84,6 +84,7 @@ function normalizeTooth(tooth: OdontogramTooth): OdontogramTooth {
     treatmentProcess: tooth.treatmentProcess ?? "",
     treatmentStatus: tooth.treatmentStatus ?? "planned",
     billableTreatmentId: tooth.billableTreatmentId ?? "",
+    billableUnitPrice: tooth.billableUnitPrice ?? null,
   };
 }
 
@@ -311,6 +312,7 @@ export default function EmrPage() {
       treatmentProcess: "",
       treatmentStatus: "planned",
       billableTreatmentId: "",
+      billableUnitPrice: null,
     })),
   );
   const [selectedToothNumber, setSelectedToothNumber] = useState("11");
@@ -372,12 +374,23 @@ export default function EmrPage() {
       | "notes"
       | "treatmentProcess"
       | "treatmentStatus"
-      | "billableTreatmentId",
+      | "billableTreatmentId"
+      | "billableUnitPrice",
     value: string,
   ) {
     setOdontogram((current) =>
       current.map((tooth) =>
-        tooth.toothNumber === toothNumber ? { ...tooth, [field]: value } : tooth,
+        tooth.toothNumber === toothNumber
+          ? {
+              ...tooth,
+              [field]:
+                field === "billableUnitPrice"
+                  ? value === ""
+                    ? null
+                    : Number(value)
+                  : value,
+            }
+          : tooth,
       ),
     );
   }
@@ -426,6 +439,7 @@ export default function EmrPage() {
           treatmentProcess: "",
           treatmentStatus: "planned",
           billableTreatmentId: "",
+          billableUnitPrice: null,
         })),
       );
       form.reset();
@@ -796,11 +810,24 @@ export default function EmrPage() {
                             <select
                               value={selectedTooth.billableTreatmentId}
                               onChange={(event) =>
-                                handleToothChange(
-                                  selectedTooth.toothNumber,
-                                  "billableTreatmentId",
-                                  event.target.value,
-                                )
+                                {
+                                  const nextTreatmentId = event.target.value;
+                                  const catalogItem = treatmentCatalog.find(
+                                    (item) => item.id === nextTreatmentId,
+                                  );
+                                  handleToothChange(
+                                    selectedTooth.toothNumber,
+                                    "billableTreatmentId",
+                                    nextTreatmentId,
+                                  );
+                                  handleToothChange(
+                                    selectedTooth.toothNumber,
+                                    "billableUnitPrice",
+                                    nextTreatmentId
+                                      ? String(catalogItem?.defaultPrice ?? "")
+                                      : "",
+                                  );
+                                }
                               }
                               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white"
                             >
@@ -813,6 +840,37 @@ export default function EmrPage() {
                             </select>
                           </label>
 
+                          <label className="space-y-1">
+                            <span className="text-sm font-medium text-slate-700">
+                              Tooth Price
+                            </span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={selectedTooth.billableUnitPrice ?? ""}
+                              onChange={(event) =>
+                                handleToothChange(
+                                  selectedTooth.toothNumber,
+                                  "billableUnitPrice",
+                                  event.target.value,
+                                )
+                              }
+                              placeholder={
+                                selectedTooth.billableTreatmentId
+                                  ? String(
+                                      treatmentCatalog.find(
+                                        (item) => item.id === selectedTooth.billableTreatmentId,
+                                      )?.defaultPrice ?? "",
+                                    )
+                                  : "No price"
+                              }
+                              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white"
+                            />
+                          </label>
+                        </div>
+
+                        <div className="mt-4 grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
                           <label className="space-y-1">
                             <span className="text-sm font-medium text-slate-700">
                               Tooth Treatment Status
