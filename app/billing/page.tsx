@@ -168,7 +168,7 @@ export default function BillingPage() {
 
   return (
     <AdminShell>
-      <div className="w-full space-y-6">
+      <div className="w-full space-y-6 print:space-y-0">
         <header className="rounded-[28px] border border-white/80 bg-white/80 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
           <p className="text-xs font-semibold uppercase tracking-[0.35em] text-sky-700">
             Module D
@@ -223,7 +223,142 @@ export default function BillingPage() {
           </div>
         ) : null}
 
-        <div className="grid gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
+        <div className="hidden print:block">
+          <section className="rounded-none border-0 bg-white p-0 text-slate-950 shadow-none">
+            <div className="border-b border-slate-200 pb-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-sky-700">
+                Payment Receipt
+              </p>
+              <h1 className="mt-2 text-3xl font-semibold">Smile Care Center</h1>
+              <p className="mt-1 text-sm text-slate-500">
+                Generated {new Date().toLocaleString()}
+              </p>
+            </div>
+
+            {!selectedInvoice ? (
+              <p className="pt-6 text-sm text-slate-600">No invoice selected for printing.</p>
+            ) : (
+              <div className="space-y-6 pt-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
+                      Patient
+                    </p>
+                    <p className="mt-1 font-semibold">{selectedInvoice.patientName}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
+                      Invoice Number
+                    </p>
+                    <p className="mt-1 font-semibold">{selectedInvoice.invoiceNumber}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
+                      Visit Date
+                    </p>
+                    <p className="mt-1 font-semibold">
+                      {formatDateLabel(selectedInvoice.issueDate)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
+                      Linked EMR
+                    </p>
+                    <p className="mt-1 font-semibold">
+                      {selectedInvoice.linkedRecordId || "Not linked"}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <h2 className="text-lg font-semibold">Charges</h2>
+                  <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200">
+                    <table className="w-full border-collapse text-sm">
+                      <thead className="bg-slate-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left font-semibold">Treatment</th>
+                          <th className="px-4 py-3 text-left font-semibold">Teeth</th>
+                          <th className="px-4 py-3 text-right font-semibold">Qty</th>
+                          <th className="px-4 py-3 text-right font-semibold">Unit Price</th>
+                          <th className="px-4 py-3 text-right font-semibold">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedInvoice.lineItems.map((item, index) => (
+                          <tr key={`${item.treatmentId}-${index}`} className="border-t border-slate-200">
+                            <td className="px-4 py-3">{item.treatment}</td>
+                            <td className="px-4 py-3">
+                              {item.toothNumbers.length > 0 ? item.toothNumbers.join(", ") : "-"}
+                            </td>
+                            <td className="px-4 py-3 text-right">{item.quantity}</td>
+                            <td className="px-4 py-3 text-right">{currency(item.unitPrice)}</td>
+                            <td className="px-4 py-3 text-right">
+                              {currency(item.quantity * item.unitPrice)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div>
+                  <h2 className="text-lg font-semibold">Payments</h2>
+                  <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200">
+                    <table className="w-full border-collapse text-sm">
+                      <thead className="bg-slate-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left font-semibold">Date</th>
+                          <th className="px-4 py-3 text-left font-semibold">Method</th>
+                          <th className="px-4 py-3 text-left font-semibold">Reference</th>
+                          <th className="px-4 py-3 text-right font-semibold">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedInvoice.payments.length === 0 ? (
+                          <tr className="border-t border-slate-200">
+                            <td colSpan={4} className="px-4 py-3 text-slate-500">
+                              No payments recorded.
+                            </td>
+                          </tr>
+                        ) : (
+                          selectedInvoice.payments.map((payment, index) => (
+                            <tr
+                              key={`${payment.method}-${payment.paidAt}-${index}`}
+                              className="border-t border-slate-200"
+                            >
+                              <td className="px-4 py-3">{formatDateLabel(payment.paidAt)}</td>
+                              <td className="px-4 py-3 capitalize">{payment.method}</td>
+                              <td className="px-4 py-3">{payment.reference || "-"}</td>
+                              <td className="px-4 py-3 text-right">{currency(payment.amount)}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="ml-auto grid w-[280px] gap-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Invoice Total</span>
+                    <span className="font-semibold">{currency(selectedInvoiceTotal)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Paid</span>
+                    <span className="font-semibold">{currency(selectedInvoicePaid)}</span>
+                  </div>
+                  <div className="flex items-center justify-between border-t border-slate-200 pt-2">
+                    <span className="font-semibold">Outstanding</span>
+                    <span className="font-semibold">{currency(selectedInvoiceOutstanding)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </section>
+        </div>
+
+        <div className="grid gap-6 print:hidden xl:grid-cols-[380px_minmax(0,1fr)]">
           <section className="rounded-[28px] border border-white/80 bg-white/85 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
             <div className="space-y-4">
               <div>
@@ -319,9 +454,19 @@ export default function BillingPage() {
                     Charges come from the treatment catalog and billable tooth entries in EMR.
                   </p>
                 </div>
-                <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">
-                  {autoGeneratedInvoices.length} auto-generated
-                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">
+                    {autoGeneratedInvoices.length} auto-generated
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    disabled={!selectedInvoice}
+                    className="rounded-full bg-slate-950 px-4 py-2 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                  >
+                    Print PDF
+                  </button>
+                </div>
               </div>
 
               {!selectedInvoice ? (
