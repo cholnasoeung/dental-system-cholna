@@ -19,7 +19,11 @@ function errorResponse(message: string, status = 400) {
 function getRegistrationErrorMessage(error: unknown) {
   if (
     error instanceof Error &&
-    (error.message.includes("MongoDB") || error.message.includes("MONGODB_URI"))
+    (
+      error.message.includes("MongoDB") ||
+      error.message.includes("MONGODB_URI") ||
+      error.message.includes("DATABASE_URL")
+    )
   ) {
     return "Unable to reach the database. Please check the database connection and try again.";
   }
@@ -84,7 +88,7 @@ export async function POST(request: Request) {
     response.cookies.set(SESSION_COOKIE_NAME, token, {
       httpOnly: true,
       sameSite: "lax",
-      secure: false,
+      secure: process.env.NODE_ENV === "production",
       path: "/",
       maxAge: 60 * 60 * 24 * 7,
     });

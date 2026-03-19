@@ -5,13 +5,33 @@ declare global {
 }
 
 function getMongoUri() {
-  const uri = process.env.MONGODB_URI;
+  const uri = process.env.MONGODB_URI ?? process.env.DATABASE_URL;
 
   if (!uri) {
-    throw new Error("MONGODB_URI is not configured.");
+    throw new Error("MONGODB_URI or DATABASE_URL is not configured.");
   }
 
   return uri;
+}
+
+function getDatabaseName() {
+  const explicitName = process.env.MONGODB_DB_NAME;
+
+  if (explicitName) {
+    return explicitName;
+  }
+
+  try {
+    const pathname = new URL(getMongoUri()).pathname.replace(/^\//, "");
+
+    if (pathname) {
+      return pathname;
+    }
+  } catch {
+    // Fall back to the existing default if the URI cannot be parsed.
+  }
+
+  return "dental_management_system";
 }
 
 function getClientPromise() {
@@ -31,5 +51,5 @@ function getClientPromise() {
 
 export async function getDatabase() {
   const connectedClient = await getClientPromise();
-  return connectedClient.db("dental_management_system");
+  return connectedClient.db(getDatabaseName());
 }
