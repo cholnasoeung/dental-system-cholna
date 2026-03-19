@@ -169,7 +169,7 @@ export default function BillingPage() {
   return (
     <AdminShell>
       <div className="w-full space-y-6 print:space-y-0">
-        <header className="rounded-[28px] border border-white/80 bg-white/80 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
+        <header className="rounded-[28px] border border-white/80 bg-white/80 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)] print:hidden">
           <p className="text-xs font-semibold uppercase tracking-[0.35em] text-sky-700">
             Module D
           </p>
@@ -212,13 +212,13 @@ export default function BillingPage() {
         </header>
 
         {isLoading ? (
-          <div className="rounded-[24px] border border-sky-100 bg-sky-50 px-5 py-4 text-sm text-sky-800">
+          <div className="rounded-[24px] border border-sky-100 bg-sky-50 px-5 py-4 text-sm text-sky-800 print:hidden">
             Loading billing data from MongoDB...
           </div>
         ) : null}
 
         {errorMessage ? (
-          <div className="rounded-[24px] border border-rose-100 bg-rose-50 px-5 py-4 text-sm text-rose-700">
+          <div className="rounded-[24px] border border-rose-100 bg-rose-50 px-5 py-4 text-sm text-rose-700 print:hidden">
             {errorMessage}
           </div>
         ) : null}

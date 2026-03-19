@@ -57,16 +57,39 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const payload = (await request.json()) as Omit<StaffMember, "id">;
+    if (!payload.fullName?.trim() || !payload.email?.trim()) {
+      return NextResponse.json(
+        { error: "Full name and email are required." },
+        { status: 400 },
+      );
+    }
+
     const db = await getDatabase();
-    const result = await db.collection<StaffDocument>("staff").insertOne({
+    const normalizedEmail = payload.email.trim().toLowerCase();
+    const staffCollection = db.collection<StaffDocument>("staff");
+    const existingMember = await staffCollection.findOne({ email: normalizedEmail });
+
+    if (existingMember) {
+      return NextResponse.json(
+        { error: "A staff member with this email already exists." },
+        { status: 409 },
+      );
+    }
+
+    const result = await staffCollection.insertOne({
       ...payload,
-      email: payload.email.trim().toLowerCase(),
+      fullName: payload.fullName.trim(),
+      email: normalizedEmail,
+      phone: payload.phone.trim(),
     });
 
     return NextResponse.json(
       {
         id: String(result.insertedId),
         ...payload,
+        fullName: payload.fullName.trim(),
+        email: normalizedEmail,
+        phone: payload.phone.trim(),
       },
       { status: 201 },
     );

@@ -12,6 +12,7 @@ import {
   type StaffMember,
   type StaffScheduleDay,
 } from "@/lib/clinic-types";
+import { getDefaultPermissionsForRole } from "@/lib/staff-access";
 
 function roleLabel(role: StaffMember["role"]) {
   return role.charAt(0).toUpperCase() + role.slice(1);
@@ -26,6 +27,14 @@ function availabilityTone(status: StaffMember["availabilityStatus"]) {
     case "off":
       return "bg-slate-200 text-slate-700";
   }
+}
+
+function createPresetForm(role: StaffMember["role"]): StaffFormState {
+  return {
+    ...initialStaffForm,
+    role,
+    permissionsText: getDefaultPermissionsForRole(role).join(", "),
+  };
 }
 
 export default function StaffPage() {
@@ -66,6 +75,16 @@ export default function StaffPage() {
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
   ) {
     const { name, value } = event.target;
+
+    if (name === "role") {
+      setStaffForm((current) => ({
+        ...current,
+        role: value as StaffMember["role"],
+        permissionsText: getDefaultPermissionsForRole(value as StaffMember["role"]).join(", "),
+      }));
+      return;
+    }
+
     setStaffForm((current) => ({ ...current, [name]: value }));
   }
 
@@ -135,6 +154,7 @@ export default function StaffPage() {
   const availableDentists = dentists.filter(
     (member) => member.availabilityStatus === "available",
   );
+  const supportStaff = staffMembers.filter((member) => member.role !== "dentist");
 
   return (
     <AdminShell>
@@ -194,7 +214,59 @@ export default function StaffPage() {
 
         <div className="space-y-6">
           <section className="rounded-[28px] border border-white/80 bg-white/85 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
-            <h3 className="text-xl font-semibold text-slate-950">Add Staff Member</h3>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <h3 className="text-xl font-semibold text-slate-950">Add Doctor or Staff</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Use a preset to quickly add a dentist or clinic staff member, then
+                  adjust availability, schedule, and permissions before saving.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStaffForm(createPresetForm("dentist"));
+                    setSchedule(defaultWeeklySchedule);
+                  }}
+                  className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+                >
+                  Add Doctor
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStaffForm(createPresetForm("receptionist"));
+                    setSchedule(defaultWeeklySchedule);
+                  }}
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
+                >
+                  Add Staff
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <article className="rounded-[26px] border border-sky-100 bg-sky-50 p-5 ring-1 ring-sky-100">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">
+                  Doctor Preset
+                </p>
+                <h4 className="mt-2 text-lg font-semibold text-slate-950">Dentist profile</h4>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Preloads dentist role, clinical permissions, and a ready weekly schedule.
+                </p>
+              </article>
+              <article className="rounded-[26px] border border-amber-100 bg-amber-50 p-5 ring-1 ring-amber-100">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-700">
+                  Staff Preset
+                </p>
+                <h4 className="mt-2 text-lg font-semibold text-slate-950">Front desk support</h4>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Preloads receptionist access for patient lookup, appointments, billing,
+                  and support management.
+                </p>
+              </article>
+            </div>
 
             <form className="mt-6 space-y-6" onSubmit={handleSubmit}>
               <div className="grid gap-4 md:grid-cols-2">
@@ -374,6 +446,10 @@ export default function StaffPage() {
                 Staff Directory
               </p>
               <h3 className="mt-2 text-xl font-semibold">Roles & Permissions</h3>
+              <p className="mt-2 text-sm leading-6 text-slate-300">
+                {dentists.length} doctor{dentists.length === 1 ? "" : "s"} and{" "}
+                {supportStaff.length} support staff currently registered in the system.
+              </p>
               <div className="mt-4 space-y-3">
                 {staffMembers.length === 0 ? (
                   <p className="rounded-2xl bg-white/10 p-4 text-sm text-slate-300">
