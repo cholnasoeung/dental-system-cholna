@@ -395,6 +395,16 @@ export const treatmentCatalog: TreatmentCatalogItem[] = [
   },
 ];
 
+export const billableTreatmentIdsByCondition: Record<ToothCondition, string[]> = {
+  healthy: ["exam-consultation", "scaling", "xray"],
+  caries: ["exam-consultation", "xray", "filling", "root-canal", "extraction"],
+  filling: ["exam-consultation", "xray", "crown"],
+  crown: ["exam-consultation", "xray", "crown"],
+  missing: ["exam-consultation", "xray", "implant"],
+  implant: ["exam-consultation", "xray", "implant"],
+  "root-canal": ["exam-consultation", "xray", "root-canal", "crown"],
+};
+
 export const initialDentalRecordForm: DentalRecordFormState = {
   patientId: "",
   visitDate: "",

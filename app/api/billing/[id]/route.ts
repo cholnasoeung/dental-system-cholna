@@ -4,6 +4,8 @@ import { NextResponse } from "next/server";
 import type { Invoice, PaymentRecord } from "@/lib/clinic-types";
 import { getDatabase } from "@/lib/mongodb";
 
+type InvoiceDocument = Omit<Invoice, "id">;
+
 function errorResponse(message: string, error: unknown) {
   return NextResponse.json(
     {
@@ -29,9 +31,10 @@ export async function PATCH(
       appendPayment?: PaymentRecord;
     };
     const db = await getDatabase();
+    const invoices = db.collection<InvoiceDocument>("billing_invoices");
 
     if (payload.appendPayment) {
-      await db.collection("billing_invoices").updateOne(
+      await invoices.updateOne(
         { _id: new ObjectId(id) },
         { $push: { payments: payload.appendPayment } },
       );
@@ -39,9 +42,11 @@ export async function PATCH(
       return NextResponse.json({ ok: true });
     }
 
-    await db.collection("billing_invoices").updateOne(
+    const { appendPayment, ...invoiceUpdates } = payload;
+
+    await invoices.updateOne(
       { _id: new ObjectId(id) },
-      { $set: payload },
+      { $set: invoiceUpdates },
     );
 
     return NextResponse.json({ ok: true });
@@ -50,4 +55,3 @@ export async function PATCH(
     return errorResponse("Failed to update invoice.", error);
   }
 }
-

@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { AdminShell } from "@/components/admin-shell";
 import {
+  billableTreatmentIdsByCondition,
   treatmentCatalog,
   toothConditionOptions,
   treatmentStatusOptions,
@@ -129,6 +130,11 @@ function normalizeTooth(tooth: OdontogramTooth): OdontogramTooth {
     billableTreatmentId: tooth.billableTreatmentId ?? "",
     billableUnitPrice: tooth.billableUnitPrice ?? null,
   };
+}
+
+function allowedTreatmentsForCondition(condition: ToothCondition) {
+  const allowedIds = billableTreatmentIdsByCondition[condition] ?? [];
+  return treatmentCatalog.filter((item) => allowedIds.includes(item.id));
 }
 
 function ToothIllustration({
@@ -655,6 +661,9 @@ export default function PatientDetailPage() {
                     const selectedTooth = selectedToothSource
                       ? normalizeTooth(selectedToothSource)
                       : null;
+                    const allowedBillableTreatments = selectedTooth
+                      ? allowedTreatmentsForCondition(selectedTooth.condition)
+                      : [];
 
                     return (
                       <article
@@ -918,14 +927,38 @@ export default function PatientDetailPage() {
                                       </span>
                                       <select
                                         value={selectedTooth.condition}
-                                        onChange={(event) =>
+                                        onChange={(event) => {
+                                          const nextCondition = event.target.value as ToothCondition;
+                                          const nextAllowedTreatments =
+                                            allowedTreatmentsForCondition(nextCondition);
+                                          const canKeepCurrentTreatment =
+                                            nextAllowedTreatments.some(
+                                              (item) =>
+                                                item.id === selectedTooth.billableTreatmentId,
+                                            );
+
                                           updateToothField(
                                             record.id,
                                             selectedTooth.toothNumber,
                                             "condition",
-                                            event.target.value,
-                                          )
-                                        }
+                                            nextCondition,
+                                          );
+
+                                          if (!canKeepCurrentTreatment) {
+                                            updateToothField(
+                                              record.id,
+                                              selectedTooth.toothNumber,
+                                              "billableTreatmentId",
+                                              "",
+                                            );
+                                            updateToothField(
+                                              record.id,
+                                              selectedTooth.toothNumber,
+                                              "billableUnitPrice",
+                                              "",
+                                            );
+                                          }
+                                        }}
                                         className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-sky-400 focus:bg-white"
                                       >
                                         {toothConditionOptions.map((condition) => (
@@ -987,7 +1020,7 @@ export default function PatientDetailPage() {
                                         className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-sky-400 focus:bg-white"
                                       >
                                         <option value="">Not billable</option>
-                                        {treatmentCatalog.map((item) => (
+                                        {allowedBillableTreatments.map((item) => (
                                           <option key={item.id} value={item.id}>
                                             {item.name} - ${item.defaultPrice} / {item.pricingModel}
                                           </option>

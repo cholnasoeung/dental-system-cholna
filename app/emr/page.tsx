@@ -4,6 +4,7 @@ import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 
 import { AdminShell } from "@/components/admin-shell";
 import {
+  billableTreatmentIdsByCondition,
   initialDentalRecordForm,
   odontogramToothNumbers,
   treatmentCatalog,
@@ -86,6 +87,11 @@ function normalizeTooth(tooth: OdontogramTooth): OdontogramTooth {
     billableTreatmentId: tooth.billableTreatmentId ?? "",
     billableUnitPrice: tooth.billableUnitPrice ?? null,
   };
+}
+
+function allowedTreatmentsForCondition(condition: ToothCondition) {
+  const allowedIds = billableTreatmentIdsByCondition[condition] ?? [];
+  return treatmentCatalog.filter((item) => allowedIds.includes(item.id));
 }
 
 function ToothIllustration({
@@ -464,6 +470,7 @@ export default function EmrPage() {
   const selectedTooth = normalizeTooth(
     toothLookup.get(selectedToothNumber) ?? toothLookup.get("11") ?? odontogram[0],
   );
+  const allowedBillableTreatments = allowedTreatmentsForCondition(selectedTooth.condition);
 
   return (
     <AdminShell>
@@ -766,13 +773,33 @@ export default function EmrPage() {
                             </span>
                             <select
                               value={selectedTooth.condition}
-                              onChange={(event) =>
+                              onChange={(event) => {
+                                const nextCondition = event.target.value as ToothCondition;
+                                const nextAllowedTreatments =
+                                  allowedTreatmentsForCondition(nextCondition);
+                                const canKeepCurrentTreatment = nextAllowedTreatments.some(
+                                  (item) => item.id === selectedTooth.billableTreatmentId,
+                                );
+
                                 handleToothChange(
                                   selectedTooth.toothNumber,
                                   "condition",
-                                  event.target.value,
-                                )
-                              }
+                                  nextCondition,
+                                );
+
+                                if (!canKeepCurrentTreatment) {
+                                  handleToothChange(
+                                    selectedTooth.toothNumber,
+                                    "billableTreatmentId",
+                                    "",
+                                  );
+                                  handleToothChange(
+                                    selectedTooth.toothNumber,
+                                    "billableUnitPrice",
+                                    "",
+                                  );
+                                }
+                              }}
                               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white"
                             >
                               {toothConditionOptions.map((condition) => (
@@ -832,7 +859,7 @@ export default function EmrPage() {
                               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white"
                             >
                               <option value="">Not billable</option>
-                              {treatmentCatalog.map((item) => (
+                              {allowedBillableTreatments.map((item) => (
                                 <option key={item.id} value={item.id}>
                                   {item.name} - ${item.defaultPrice} / {item.pricingModel}
                                 </option>
