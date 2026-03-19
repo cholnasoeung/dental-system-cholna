@@ -8,6 +8,9 @@ import {
   type Invoice,
   type PatientProfile,
   type Prescription,
+  type SupportTicket,
+  initialSupportTicketForm,
+  supportCategoryOptions,
 } from "@/lib/clinic-types";
 
 function formatDateLabel(date: string) {
@@ -40,6 +43,30 @@ function invoicePaid(invoice: Invoice) {
   return invoice.payments.reduce((sum, payment) => sum + payment.amount, 0);
 }
 
+function supportCategoryLabel(category: SupportTicket["category"]) {
+  switch (category) {
+    case "general":
+      return "General";
+    case "billing":
+      return "Billing";
+    case "appointment":
+      return "Appointment";
+  }
+}
+
+function supportStatusTone(status: SupportTicket["status"]) {
+  switch (status) {
+    case "open":
+      return "bg-amber-100 text-amber-800";
+    case "in-progress":
+      return "bg-sky-100 text-sky-800";
+    case "resolved":
+      return "bg-emerald-100 text-emerald-800";
+    case "closed":
+      return "bg-slate-200 text-slate-700";
+  }
+}
+
 export default function PortalPage() {
   const [patients, setPatients] = useState<PatientProfile[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -53,8 +80,15 @@ export default function PortalPage() {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [selectedPrescription, setSelectedPrescription] =
     useState<Prescription | null>(null);
+  const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]);
+  const [selectedSupportTicket, setSelectedSupportTicket] =
+    useState<SupportTicket | null>(null);
+  const [supportForm, setSupportForm] = useState(initialSupportTicketForm);
+  const [supportReply, setSupportReply] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isLoadingSupport, setIsLoadingSupport] = useState(false);
+  const [isSavingSupport, setIsSavingSupport] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
@@ -111,6 +145,51 @@ export default function PortalPage() {
 
     loadPortalData();
   }, []);
+
+  useEffect(() => {
+    async function loadSupportTickets() {
+      if (!currentPatient || !portalDob) {
+        setSupportTickets([]);
+        setSelectedSupportTicket(null);
+        return;
+      }
+
+      try {
+        setIsLoadingSupport(true);
+
+        const searchParams = new URLSearchParams({
+          patientId: currentPatient.id,
+          portalDob,
+        });
+        const response = await fetch(`/api/support?${searchParams.toString()}`, {
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          throw new Error(await response.text());
+        }
+
+        const data = (await response.json()) as SupportTicket[];
+        setSupportTickets(data);
+        setSelectedSupportTicket((current) => {
+          if (current) {
+            return data.find((ticket) => ticket.id === current.id) ?? data[0] ?? null;
+          }
+
+          return data[0] ?? null;
+        });
+      } catch (error) {
+        console.error(error);
+        setErrorMessage(
+          error instanceof Error ? error.message : "Unable to load support tickets.",
+        );
+      } finally {
+        setIsLoadingSupport(false);
+      }
+    }
+
+    loadSupportTickets();
+  }, [currentPatient, portalDob]);
 
   function handlePortalLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -182,6 +261,93 @@ export default function PortalPage() {
       setErrorMessage("Profile update failed.");
     } finally {
       setIsSavingProfile(false);
+    }
+  }
+
+  async function handleSupportSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!currentPatient || !portalDob || !supportForm.subject.trim() || !supportForm.message.trim()) {
+      return;
+    }
+
+    try {
+      setIsSavingSupport(true);
+      setErrorMessage("");
+
+      const response = await fetch("/api/support", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          patientId: currentPatient.id,
+          portalDob,
+          subject: supportForm.subject,
+          category: supportForm.category,
+          message: supportForm.message,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      const nextTicket = (await response.json()) as SupportTicket;
+      setSupportTickets((current) => [nextTicket, ...current]);
+      setSelectedSupportTicket(nextTicket);
+      setSupportForm(initialSupportTicketForm);
+    } catch (error) {
+      console.error(error);
+      setErrorMessage(
+        error instanceof Error ? error.message : "Support ticket could not be created.",
+      );
+    } finally {
+      setIsSavingSupport(false);
+    }
+  }
+
+  async function handleSupportReply(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!currentPatient || !portalDob || !selectedSupportTicket || !supportReply.trim()) {
+      return;
+    }
+
+    try {
+      setIsSavingSupport(true);
+      setErrorMessage("");
+
+      const response = await fetch(`/api/support/${selectedSupportTicket.id}/messages`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          patientId: currentPatient.id,
+          portalDob,
+          message: supportReply,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      const updatedTicket = (await response.json()) as SupportTicket;
+      setSelectedSupportTicket(updatedTicket);
+      setSupportTickets((current) => [
+        updatedTicket,
+        ...current.filter((ticket) => ticket.id !== updatedTicket.id),
+      ]);
+      setSupportReply("");
+    } catch (error) {
+      console.error(error);
+      setErrorMessage(
+        error instanceof Error ? error.message : "Support reply could not be sent.",
+      );
+    } finally {
+      setIsSavingSupport(false);
     }
   }
 
@@ -295,6 +461,10 @@ export default function PortalPage() {
                 setCurrentPatient(null);
                 setSelectedInvoice(null);
                 setSelectedPrescription(null);
+                setSelectedSupportTicket(null);
+                setSupportTickets([]);
+                setSupportForm(initialSupportTicketForm);
+                setSupportReply("");
                 setPortalId("");
                 setPortalDob("");
               }}
@@ -546,6 +716,233 @@ export default function PortalPage() {
               {isSavingProfile ? "Saving Profile..." : "Save Profile"}
             </button>
           </form>
+        </section>
+
+        <section className="rounded-[28px] border border-white/80 bg-white/85 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div>
+              <h2 className="text-2xl font-semibold text-slate-950">Support</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Send a question to the clinic and follow the conversation here.
+              </p>
+            </div>
+            <div className="rounded-2xl bg-sky-50 px-4 py-3 text-sm text-sky-800 ring-1 ring-sky-100">
+              {supportTickets.length} ticket{supportTickets.length === 1 ? "" : "s"}
+            </div>
+          </div>
+
+          {isLoadingSupport ? (
+            <p className="mt-4 rounded-2xl bg-sky-50 px-4 py-3 text-sm text-sky-800">
+              Loading support tickets...
+            </p>
+          ) : null}
+
+          <div className="mt-6 grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
+            <form
+              className="rounded-[28px] border border-slate-200 bg-slate-50 p-5"
+              onSubmit={handleSupportSubmit}
+            >
+              <h3 className="text-lg font-semibold text-slate-950">Create Ticket</h3>
+              <div className="mt-4 space-y-4">
+                <label className="space-y-1">
+                  <span className="text-sm font-medium text-slate-700">Subject</span>
+                  <input
+                    value={supportForm.subject}
+                    onChange={(event) =>
+                      setSupportForm((current) => ({
+                        ...current,
+                        subject: event.target.value,
+                      }))
+                    }
+                    placeholder="Need help with my visit"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400"
+                  />
+                </label>
+                <label className="space-y-1">
+                  <span className="text-sm font-medium text-slate-700">Category</span>
+                  <select
+                    value={supportForm.category}
+                    onChange={(event) =>
+                      setSupportForm((current) => ({
+                        ...current,
+                        category: event.target.value as SupportTicket["category"],
+                      }))
+                    }
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400"
+                  >
+                    {supportCategoryOptions.map((category) => (
+                      <option key={category} value={category}>
+                        {supportCategoryLabel(category)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="space-y-1">
+                  <span className="text-sm font-medium text-slate-700">Message</span>
+                  <textarea
+                    value={supportForm.message}
+                    onChange={(event) =>
+                      setSupportForm((current) => ({
+                        ...current,
+                        message: event.target.value,
+                      }))
+                    }
+                    placeholder="Tell us what you need help with."
+                    className="min-h-28 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400"
+                  />
+                </label>
+              </div>
+              <button
+                type="submit"
+                disabled={isSavingSupport}
+                className="mt-5 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                {isSavingSupport ? "Sending..." : "Send Ticket"}
+              </button>
+            </form>
+
+            <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+              <div className="space-y-3">
+                {supportTickets.length === 0 ? (
+                  <p className="rounded-2xl bg-slate-100 p-4 text-sm text-slate-600">
+                    No support tickets yet.
+                  </p>
+                ) : (
+                  supportTickets.map((ticket) => (
+                    <button
+                      key={ticket.id}
+                      type="button"
+                      onClick={() => setSelectedSupportTicket(ticket)}
+                      className={`w-full rounded-3xl border p-4 text-left transition ${
+                        selectedSupportTicket?.id === ticket.id
+                          ? "border-sky-300 bg-sky-50"
+                          : "border-slate-200 bg-white hover:bg-slate-50"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-slate-900">{ticket.subject}</p>
+                          <p className="mt-1 text-sm text-slate-500">
+                            {supportCategoryLabel(ticket.category)}
+                          </p>
+                        </div>
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-medium ${supportStatusTone(
+                            ticket.status,
+                          )}`}
+                        >
+                          {ticket.status}
+                        </span>
+                      </div>
+                      <p className="mt-3 text-sm text-slate-600">
+                        Last updated {formatDateLabel(ticket.lastMessageAt)}
+                      </p>
+                    </button>
+                  ))
+                )}
+              </div>
+
+              <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
+                {selectedSupportTicket ? (
+                  <>
+                    <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <h3 className="text-xl font-semibold text-slate-950">
+                          {selectedSupportTicket.subject}
+                        </h3>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {supportCategoryLabel(selectedSupportTicket.category)} | Priority{" "}
+                          {selectedSupportTicket.priority}
+                        </p>
+                      </div>
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-medium ${supportStatusTone(
+                          selectedSupportTicket.status,
+                        )}`}
+                      >
+                        {selectedSupportTicket.status}
+                      </span>
+                    </div>
+
+                    <div className="mt-4 space-y-3">
+                      {selectedSupportTicket.messages.map((message) => (
+                        <article
+                          key={message.id}
+                          className={`rounded-3xl p-4 ${
+                            message.senderType === "patient"
+                              ? "bg-white ring-1 ring-slate-200"
+                              : "bg-slate-950 text-white"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <p
+                              className={`font-semibold ${
+                                message.senderType === "patient"
+                                  ? "text-slate-950"
+                                  : "text-white"
+                              }`}
+                            >
+                              {message.senderName}
+                            </p>
+                            <p
+                              className={`text-xs uppercase tracking-[0.2em] ${
+                                message.senderType === "patient"
+                                  ? "text-slate-400"
+                                  : "text-cyan-200"
+                              }`}
+                            >
+                              {formatDateLabel(message.createdAt)}
+                            </p>
+                          </div>
+                          <p
+                            className={`mt-3 text-sm leading-6 ${
+                              message.senderType === "patient"
+                                ? "text-slate-600"
+                                : "text-slate-200"
+                            }`}
+                          >
+                            {message.message}
+                          </p>
+                        </article>
+                      ))}
+                    </div>
+
+                    {selectedSupportTicket.status === "open" ||
+                    selectedSupportTicket.status === "in-progress" ? (
+                      <form className="mt-5 space-y-3" onSubmit={handleSupportReply}>
+                        <label className="space-y-1">
+                          <span className="text-sm font-medium text-slate-700">
+                            Follow-up message
+                          </span>
+                          <textarea
+                            value={supportReply}
+                            onChange={(event) => setSupportReply(event.target.value)}
+                            placeholder="Add more details for the clinic team."
+                            className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400"
+                          />
+                        </label>
+                        <button
+                          type="submit"
+                          disabled={isSavingSupport}
+                          className="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                        >
+                          {isSavingSupport ? "Sending..." : "Send Reply"}
+                        </button>
+                      </form>
+                    ) : (
+                      <p className="mt-5 rounded-2xl bg-white px-4 py-3 text-sm text-slate-600 ring-1 ring-slate-200">
+                        This ticket is {selectedSupportTicket.status}. New patient replies are disabled.
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="rounded-2xl bg-white p-4 text-sm text-slate-600 ring-1 ring-slate-200">
+                    Select a support ticket to read the conversation.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
         </section>
       </div>
     </div>

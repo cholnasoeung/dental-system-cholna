@@ -62,6 +62,10 @@ export function canAccessPath(
     return hasPermission(user, "appointment-manage");
   }
 
+  if (pathname.startsWith("/support") || pathname.startsWith("/api/support")) {
+    return hasPermission(user, "support-manage");
+  }
+
   if (pathname.startsWith("/reports")) {
     return hasPermission(user, "report-view");
   }

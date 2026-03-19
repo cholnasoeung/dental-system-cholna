@@ -4,11 +4,18 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
+import { staffRoleOptions, type StaffRole } from "@/lib/clinic-types";
+
+function roleLabel(role: StaffRole) {
+  return role.charAt(0).toUpperCase() + role.slice(1);
+}
+
 export default function RegisterPage() {
   const router = useRouter();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [role, setRole] = useState<StaffRole>("receptionist");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -24,7 +31,7 @@ export default function RegisterPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ fullName, email, password }),
+        body: JSON.stringify({ fullName, email, password, role }),
       });
 
       if (!response.ok) {
@@ -52,7 +59,8 @@ export default function RegisterPage() {
           Register
         </h1>
         <p className="mt-3 text-sm leading-6 text-slate-600">
-          Create your account. The first registered user becomes admin automatically.
+          Create your account and choose a staff role. The first registered user
+          still becomes admin automatically.
         </p>
 
         {errorMessage ? (
@@ -86,6 +94,20 @@ export default function RegisterPage() {
             placeholder="Password"
             className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white"
           />
+          <label className="block space-y-1">
+            <span className="text-sm font-medium text-slate-700">Role</span>
+            <select
+              value={role}
+              onChange={(event) => setRole(event.target.value as StaffRole)}
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white"
+            >
+              {staffRoleOptions.map((option) => (
+                <option key={option} value={option}>
+                  {roleLabel(option)}
+                </option>
+              ))}
+            </select>
+          </label>
           <button
             type="submit"
             disabled={isSubmitting}

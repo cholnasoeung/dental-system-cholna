@@ -15,6 +15,7 @@ const routes = [
   "/reports",
   "/staff",
   "/portal",
+  "/support-center",
 ];
 
 export default function sitemap(): MetadataRoute.Sitemap {

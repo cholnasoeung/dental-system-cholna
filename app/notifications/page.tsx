@@ -242,7 +242,7 @@ export default function NotificationsPage() {
     setNotificationForm((current) => ({ ...current, [name]: value }));
   }
 
-  function useSuggestion(suggestion: NotificationFormState) {
+  function applySuggestion(suggestion: NotificationFormState) {
     setNotificationForm(suggestion);
   }
 
@@ -505,7 +505,7 @@ export default function NotificationsPage() {
                     <button
                       key={`${suggestion.category}-${suggestion.patientId}-${index}`}
                       type="button"
-                      onClick={() => useSuggestion(suggestion)}
+                      onClick={() => applySuggestion(suggestion)}
                       className="w-full rounded-3xl border border-slate-200 bg-slate-50 p-4 text-left transition hover:bg-white"
                     >
                       <div className="flex items-start justify-between gap-3">

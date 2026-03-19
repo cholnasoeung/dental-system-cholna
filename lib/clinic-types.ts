@@ -248,6 +248,40 @@ export type StaffFormState = Omit<StaffMember, "id" | "schedule" | "permissions"
   permissionsText: string;
 };
 
+export type SupportCategory = "general" | "billing" | "appointment";
+
+export type SupportPriority = "low" | "medium" | "high";
+
+export type SupportStatus = "open" | "in-progress" | "resolved" | "closed";
+
+export type SupportMessage = {
+  id: string;
+  senderType: "patient" | "staff";
+  senderName: string;
+  message: string;
+  createdAt: string;
+};
+
+export type SupportTicket = {
+  id: string;
+  patientId: string;
+  patientName: string;
+  subject: string;
+  category: SupportCategory;
+  priority: SupportPriority;
+  status: SupportStatus;
+  createdAt: string;
+  updatedAt: string;
+  lastMessageAt: string;
+  messages: SupportMessage[];
+};
+
+export type SupportTicketFormState = {
+  subject: string;
+  category: SupportCategory;
+  message: string;
+};
+
 export const dentists = ["Dr. Lina", "Dr. Sreypov", "Dr. Dara", "Dr. Michael"];
 
 export const statusOptions: AppointmentStatus[] = [
@@ -510,7 +544,29 @@ export const staffPermissionOptions = [
   "billing-manage",
   "emr-manage",
   "report-view",
+  "support-manage",
 ];
+
+export const supportCategoryOptions: SupportCategory[] = [
+  "general",
+  "billing",
+  "appointment",
+];
+
+export const supportPriorityOptions: SupportPriority[] = ["low", "medium", "high"];
+
+export const supportStatusOptions: SupportStatus[] = [
+  "open",
+  "in-progress",
+  "resolved",
+  "closed",
+];
+
+export const initialSupportTicketForm: SupportTicketFormState = {
+  subject: "",
+  category: "general",
+  message: "",
+};
 
 export const defaultWeeklySchedule: StaffScheduleDay[] = [
   { day: "Monday", start: "08:00", end: "17:00", available: true },

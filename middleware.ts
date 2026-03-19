@@ -13,10 +13,13 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/_next/static") ||
     pathname.startsWith("/_next/image") ||
     pathname === "/favicon.ico" ||
+    pathname === "/" ||
     pathname.startsWith("/login") ||
     pathname.startsWith("/register") ||
+    pathname.startsWith("/support-center") ||
     pathname.startsWith("/unauthorized") ||
     pathname.startsWith("/portal") ||
+    pathname.startsWith("/api/support") ||
     pathname.startsWith("/api/auth");
 
   if (isPublicPath) {

@@ -24,6 +24,7 @@ const menuSections = [
     title: "Operations",
     items: [
       { label: "Notifications", href: "/notifications" },
+      { label: "Support", href: "/support" },
       { label: "Patient Portal", href: "/portal" },
     ],
   },

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { staffPermissionOptions, type StaffMember } from "@/lib/clinic-types";
+import { staffRoleOptions, staffPermissionOptions, type StaffMember } from "@/lib/clinic-types";
 import { getDatabase } from "@/lib/mongodb";
 import { hashPassword } from "@/lib/password";
 import { createSessionToken, SESSION_COOKIE_NAME } from "@/lib/session";
@@ -31,16 +31,49 @@ function getRegistrationErrorMessage(error: unknown) {
   return "Registration failed.";
 }
 
+function getDefaultPermissionsForRole(role: StaffMember["role"]) {
+  switch (role) {
+    case "admin":
+      return [...staffPermissionOptions];
+    case "manager":
+      return [
+        "patient-read",
+        "patient-write",
+        "appointment-manage",
+        "billing-manage",
+        "emr-manage",
+        "report-view",
+        "support-manage",
+      ];
+    case "dentist":
+      return ["patient-read", "appointment-manage", "emr-manage"];
+    case "nurse":
+      return ["patient-read", "appointment-manage", "emr-manage"];
+    case "receptionist":
+      return [
+        "patient-read",
+        "appointment-manage",
+        "billing-manage",
+        "support-manage",
+      ];
+  }
+}
+
 export async function POST(request: Request) {
   try {
-    const { fullName, email, password } = (await request.json()) as {
+    const { fullName, email, password, role } = (await request.json()) as {
       fullName: string;
       email: string;
       password: string;
+      role?: string;
     };
 
     if (!fullName || !email || !password) {
       return errorResponse("Full name, email, and password are required.");
+    }
+
+    if (role && !staffRoleOptions.includes(role as StaffMember["role"])) {
+      return errorResponse("Selected role is invalid.");
     }
 
     const normalizedEmail = email.trim().toLowerCase();
@@ -54,14 +87,15 @@ export async function POST(request: Request) {
 
     const staffCount = await staffCollection.countDocuments();
     const isFirstUser = staffCount === 0;
-    const role: StaffMember["role"] = isFirstUser ? "admin" : "receptionist";
+    const selectedRole = (role as StaffMember["role"] | undefined) ?? "receptionist";
+    const assignedRole: StaffMember["role"] = isFirstUser ? "admin" : selectedRole;
     const permissions = isFirstUser
       ? [...staffPermissionOptions]
-      : ["patient-read", "appointment-manage"];
+      : getDefaultPermissionsForRole(assignedRole);
 
     const payload: Omit<StaffAuthDocument, "_id"> = {
       fullName,
-      role,
+      role: assignedRole,
       email: normalizedEmail,
       phone: "",
       permissions,
@@ -75,13 +109,13 @@ export async function POST(request: Request) {
       userId: String(result.insertedId),
       email: normalizedEmail,
       fullName,
-      role,
+      role: assignedRole,
       permissions,
     });
 
     const response = NextResponse.json({
       ok: true,
-      role,
+      role: assignedRole,
       permissions,
     });
 
