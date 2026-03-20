@@ -1,9 +1,43 @@
-import { ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
 
-import { upsertAutoInvoiceForRecord } from "@/lib/billing";
-import type { DentalRecord } from "@/lib/clinic-types";
-import { getDatabase } from "@/lib/mongodb";
+import type { ClinicalAttachment, DentalRecord, OdontogramTooth } from "@/lib/clinic-types";
+import { withOracleConnection } from "@/lib/oracle";
+
+type EmrMetadata = {
+  patientName?: string;
+  chiefComplaint?: string;
+  consultationNotes?: string;
+  treatmentStep?: string;
+  treatmentStatus?: DentalRecord["treatmentStatus"];
+  procedureHistory?: string;
+  clinicalAttachments?: ClinicalAttachment[];
+  odontogram?: OdontogramTooth[];
+};
+
+function normalizeTooth(tooth: OdontogramTooth): OdontogramTooth {
+  return {
+    toothNumber: tooth.toothNumber,
+    condition: tooth.condition,
+    notes: tooth.notes ?? "",
+    treatmentProcess: tooth.treatmentProcess ?? "",
+    treatmentStatus: tooth.treatmentStatus ?? "planned",
+    billableTreatmentId: tooth.billableTreatmentId ?? "",
+    billableUnitPrice: tooth.billableUnitPrice ?? null,
+  };
+}
+
+function buildMetadata(payload: Partial<Omit<DentalRecord, "id">>) {
+  return JSON.stringify({
+    patientName: payload.patientName ?? "",
+    chiefComplaint: payload.chiefComplaint ?? "",
+    consultationNotes: payload.consultationNotes ?? "",
+    treatmentStep: payload.treatmentStep ?? "",
+    treatmentStatus: payload.treatmentStatus ?? "planned",
+    procedureHistory: payload.procedureHistory ?? "",
+    clinicalAttachments: payload.clinicalAttachments ?? [],
+    odontogram: (payload.odontogram ?? []).map(normalizeTooth),
+  } satisfies EmrMetadata);
+}
 
 function errorResponse(message: string, error: unknown) {
   return NextResponse.json(
@@ -27,42 +61,34 @@ export async function PATCH(
   try {
     const { id } = await context.params;
     const payload = (await request.json()) as Partial<Omit<DentalRecord, "id">>;
-    const db = await getDatabase();
 
-    await db.collection("emr_records").updateOne(
-      { _id: new ObjectId(id) },
-      { $set: payload },
+    await withOracleConnection((connection) =>
+      connection.execute(
+        `
+          UPDATE EMR_RECORDS
+          SET
+            PATIENT_ID = :patientId,
+            DIAGNOSIS = :diagnosis,
+            TREATMENT_PLAN = :treatmentPlan,
+            CLINICAL_NOTES = :clinicalNotes,
+            RECORD_DATE = CASE
+              WHEN :visitDate = '' THEN RECORD_DATE
+              ELSE TO_TIMESTAMP(:visitDate, 'YYYY-MM-DD')
+            END,
+            UPDATED_AT = CURRENT_TIMESTAMP
+          WHERE ID = :id
+        `,
+        {
+          id: Number(id),
+          patientId: payload.patientId ? Number(payload.patientId) : null,
+          diagnosis: payload.diagnoses ?? "",
+          treatmentPlan: payload.treatmentPlan ?? "",
+          clinicalNotes: buildMetadata(payload),
+          visitDate: payload.visitDate ?? "",
+        },
+        { autoCommit: true },
+      ),
     );
-
-    const updatedRecord = await db.collection<Omit<DentalRecord, "id">>("emr_records").findOne({
-      _id: new ObjectId(id),
-    });
-
-    if (updatedRecord) {
-      await upsertAutoInvoiceForRecord(db, {
-        id,
-        patientId: updatedRecord.patientId,
-        patientName: updatedRecord.patientName,
-        visitDate: updatedRecord.visitDate,
-        chiefComplaint: updatedRecord.chiefComplaint,
-        consultationNotes: updatedRecord.consultationNotes,
-        diagnoses: updatedRecord.diagnoses,
-        treatmentPlan: updatedRecord.treatmentPlan,
-        treatmentStep: updatedRecord.treatmentStep ?? "",
-        treatmentStatus: updatedRecord.treatmentStatus ?? "planned",
-        procedureHistory: updatedRecord.procedureHistory,
-        clinicalAttachments: updatedRecord.clinicalAttachments ?? [],
-        odontogram: (updatedRecord.odontogram ?? []).map((tooth) => ({
-          toothNumber: tooth.toothNumber,
-          condition: tooth.condition,
-          notes: tooth.notes ?? "",
-          treatmentProcess: tooth.treatmentProcess ?? "",
-          treatmentStatus: tooth.treatmentStatus ?? "planned",
-          billableTreatmentId: tooth.billableTreatmentId ?? "",
-          billableUnitPrice: tooth.billableUnitPrice ?? null,
-        })),
-      });
-    }
 
     return NextResponse.json({ ok: true });
   } catch (error) {
