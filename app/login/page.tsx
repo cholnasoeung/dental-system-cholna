@@ -7,7 +7,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") || "/";
+  const callbackUrl = searchParams.get("callbackUrl");
+  const redirectUrl =
+    callbackUrl && callbackUrl.startsWith("/") && callbackUrl !== "/"
+      ? callbackUrl
+      : "/reports";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -33,7 +37,7 @@ function LoginPageContent() {
         throw new Error(data.error || "Login failed.");
       }
 
-      router.push(callbackUrl);
+      router.push(redirectUrl);
       router.refresh();
     } catch (error) {
       setErrorMessage(
