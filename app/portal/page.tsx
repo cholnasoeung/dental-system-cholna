@@ -291,7 +291,9 @@ export default function PortalPage() {
     event.preventDefault();
 
     const matchedPatient = patients.find(
-      (patient) => patient.id === portalId && patient.dateOfBirth === portalDob,
+      (patient) =>
+        (patient.patientId === portalId || patient.id === portalId) &&
+        patient.dateOfBirth === portalDob,
     );
 
     if (!matchedPatient) {

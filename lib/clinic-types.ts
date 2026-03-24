@@ -1,30 +1,169 @@
 export type UploadedFile = {
+  id?: string;
   name: string;
   size: number;
+  type?: string;
+  category?:
+    | "document"
+    | "insurance-card"
+    | "consent-form"
+    | "xray"
+    | "image"
+    | "profile-photo";
+  url?: string;
+  uploadedAt?: string;
+};
+
+export type PatientStatus = "active" | "inactive" | "blocked" | "deceased";
+
+export type PatientType = "new" | "returning" | "VIP";
+
+export type RiskLevel = "low" | "medium" | "high";
+
+export type PreferredContactMethod = "phone" | "sms" | "email";
+
+export type BillingPreference = "cash" | "insurance" | "mixed";
+
+export type PrivacyLevel = "standard" | "restricted" | "strict";
+
+export type PregnancyStatus = "not-applicable" | "pregnant" | "not-pregnant" | "unknown";
+
+export type PatientNoteType = "clinical" | "admin" | "warning";
+
+export type PatientTimelineNote = {
+  id: string;
+  patientId: string;
+  createdAt: string;
+  staffUser: string;
+  noteType: PatientNoteType;
+  content: string;
+};
+
+export type PatientAnalytics = {
+  totalVisits: number;
+  totalRevenue: number;
+  lastVisit: string;
+  mostCommonTreatment: string;
+  doctorsVisited: string[];
+  treatmentsDone: string[];
+  totalAppointments: number;
+  completedAppointments: number;
+};
+
+export type PatientDuplicateCandidate = {
+  patientId: string;
+  fullName: string;
+  reason: string;
+  score: number;
+};
+
+export type PatientFamilyMember = {
+  id: string;
+  patientId: string;
+  fullName: string;
+  relationshipHint: string;
 };
 
 export type PatientProfile = {
   id: string;
+  patientId: string;
+  nationalId: string;
+  passportNumber: string;
   fullName: string;
   dateOfBirth: string;
   gender: string;
   phone: string;
+  phoneNumbers: string[];
   email: string;
+  province: string;
+  city: string;
   address: string;
+  fullAddress: string;
+  profilePhoto: string;
+  status: PatientStatus;
+  registrationDate: string;
+  lastVisitDate: string;
+  patientType: PatientType;
   occupation: string;
   emergencyContactName: string;
   emergencyContactRelation: string;
   emergencyContactPhone: string;
+  secondaryContactName: string;
+  secondaryContactRelation: string;
+  secondaryContactPhone: string;
+  familyMemberIds: string[];
   medicalHistory: string;
+  oralHealthHistory: {
+    gumDiseaseHistory: string;
+    cavitiesHistory: string;
+    orthodonticHistory: string;
+    implantsCrownsBridges: string;
+    missingTeethRecord: string;
+  };
+  medicalConditions: {
+    diabetes: boolean;
+    heartDisease: boolean;
+    highBloodPressure: boolean;
+    pregnancyStatus: PregnancyStatus;
+    bleedingDisorders: boolean;
+    notes: string;
+  };
   allergies: string;
+  allergyProfile: {
+    drugAllergies: string;
+    anesthesiaAllergy: string;
+    materialAllergy: string;
+  };
+  riskLevel: RiskLevel;
   insuranceProvider: string;
   policyNumber: string;
+  coverageLimit: number | null;
   insuranceExpiry: string;
+  billingPreference: BillingPreference;
+  creditBalance: number;
   documents: UploadedFile[];
   xrays: UploadedFile[];
+  insuranceCards: UploadedFile[];
+  consentForms: UploadedFile[];
+  communicationPreferences: {
+    preferredContactMethod: PreferredContactMethod;
+    appointmentReminders: boolean;
+    followUpReminders: boolean;
+  };
+  settings: {
+    allowNotifications: boolean;
+    privacyLevel: PrivacyLevel;
+    marketingConsent: boolean;
+  };
+  alertFlags: {
+    unpaidBills: boolean;
+    highRiskMedical: boolean;
+    frequentNoShow: boolean;
+    vip: boolean;
+  };
+  notesTimeline?: PatientTimelineNote[];
+  analytics?: PatientAnalytics;
+  duplicateCandidates?: PatientDuplicateCandidate[];
+  familyMembers?: PatientFamilyMember[];
 };
 
-export type PatientFormState = Omit<PatientProfile, "id" | "documents" | "xrays">;
+export type PatientFormState = Omit<
+  PatientProfile,
+  | "id"
+  | "patientId"
+  | "lastVisitDate"
+  | "documents"
+  | "xrays"
+  | "insuranceCards"
+  | "consentForms"
+  | "notesTimeline"
+  | "analytics"
+  | "duplicateCandidates"
+  | "familyMembers"
+> & {
+  phoneNumbersText: string;
+  familyMemberIdsText: string;
+};
 
 export type AppointmentStatus =
   | "scheduled"
@@ -466,22 +605,120 @@ export const statusStyles: Record<AppointmentStatus, string> = {
 };
 
 export const initialPatientForm: PatientFormState = {
+  nationalId: "",
+  passportNumber: "",
   fullName: "",
   dateOfBirth: "",
   gender: "",
   phone: "",
+  phoneNumbers: [],
+  phoneNumbersText: "",
   email: "",
+  province: "",
+  city: "",
   address: "",
+  fullAddress: "",
+  profilePhoto: "",
+  status: "active",
+  registrationDate: "",
+  patientType: "new",
   occupation: "",
   emergencyContactName: "",
   emergencyContactRelation: "",
   emergencyContactPhone: "",
+  secondaryContactName: "",
+  secondaryContactRelation: "",
+  secondaryContactPhone: "",
+  familyMemberIds: [],
+  familyMemberIdsText: "",
   medicalHistory: "",
+  oralHealthHistory: {
+    gumDiseaseHistory: "",
+    cavitiesHistory: "",
+    orthodonticHistory: "",
+    implantsCrownsBridges: "",
+    missingTeethRecord: "",
+  },
+  medicalConditions: {
+    diabetes: false,
+    heartDisease: false,
+    highBloodPressure: false,
+    pregnancyStatus: "unknown",
+    bleedingDisorders: false,
+    notes: "",
+  },
   allergies: "",
+  allergyProfile: {
+    drugAllergies: "",
+    anesthesiaAllergy: "",
+    materialAllergy: "",
+  },
+  riskLevel: "low",
   insuranceProvider: "",
   policyNumber: "",
+  coverageLimit: null,
   insuranceExpiry: "",
+  billingPreference: "cash",
+  creditBalance: 0,
+  communicationPreferences: {
+    preferredContactMethod: "phone",
+    appointmentReminders: true,
+    followUpReminders: true,
+  },
+  settings: {
+    allowNotifications: true,
+    privacyLevel: "standard",
+    marketingConsent: false,
+  },
+  alertFlags: {
+    unpaidBills: false,
+    highRiskMedical: false,
+    frequentNoShow: false,
+    vip: false,
+  },
 };
+
+export const patientStatusOptions: PatientStatus[] = [
+  "active",
+  "inactive",
+  "blocked",
+  "deceased",
+];
+
+export const patientTypeOptions: PatientType[] = ["new", "returning", "VIP"];
+
+export const riskLevelOptions: RiskLevel[] = ["low", "medium", "high"];
+
+export const pregnancyStatusOptions: PregnancyStatus[] = [
+  "not-applicable",
+  "pregnant",
+  "not-pregnant",
+  "unknown",
+];
+
+export const preferredContactMethodOptions: PreferredContactMethod[] = [
+  "phone",
+  "sms",
+  "email",
+];
+
+export const billingPreferenceOptions: BillingPreference[] = [
+  "cash",
+  "insurance",
+  "mixed",
+];
+
+export const privacyLevelOptions: PrivacyLevel[] = [
+  "standard",
+  "restricted",
+  "strict",
+];
+
+export const patientNoteTypeOptions: PatientNoteType[] = [
+  "clinical",
+  "admin",
+  "warning",
+];
 
 export const initialAppointmentForm: AppointmentFormState = {
   patientId: "",

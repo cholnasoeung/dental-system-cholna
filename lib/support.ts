@@ -237,7 +237,9 @@ export async function verifyPortalPatientAccess(access: PortalAccess) {
   }
 
   patientQuery.$or.push(
+    { patientId: lookupValue },
     { phone: lookupValue },
+    { phoneNumbers: lookupValue },
     { email: { $regex: `^${escapeRegex(lookupValue)}$`, $options: "i" } },
     { fullName: { $regex: `^${escapeRegex(lookupValue)}$`, $options: "i" } },
   );

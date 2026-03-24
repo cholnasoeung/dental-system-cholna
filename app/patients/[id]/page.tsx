@@ -6,12 +6,14 @@ import { useEffect, useMemo, useState } from "react";
 
 import { AdminShell } from "@/components/admin-shell";
 import {
+  patientNoteTypeOptions,
   toothConditionPricing,
   toothConditionOptions,
   treatmentStatusOptions,
   type DentalRecord,
   type OdontogramTooth,
   type PatientProfile,
+  type PatientTimelineNote,
   type ToothCondition,
   type TreatmentStatus,
 } from "@/lib/clinic-types";
@@ -71,6 +73,13 @@ function calculateAge(dateOfBirth: string) {
   }
 
   return `${age} yrs`;
+}
+
+function currency(amount: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(amount);
 }
 
 function getToothConditionClass(condition: string) {
@@ -329,6 +338,9 @@ export default function PatientDetailPage() {
   >({});
   const [isLoading, setIsLoading] = useState(true);
   const [savingRecordId, setSavingRecordId] = useState("");
+  const [noteType, setNoteType] = useState<PatientTimelineNote["noteType"]>("clinical");
+  const [noteContent, setNoteContent] = useState("");
+  const [isSavingNote, setIsSavingNote] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
@@ -478,6 +490,52 @@ export default function PatientDetailPage() {
     }
   }
 
+  async function handleAddNote() {
+    if (!patient || !noteContent.trim()) {
+      return;
+    }
+
+    try {
+      setIsSavingNote(true);
+      setErrorMessage("");
+
+      const response = await fetch(`/api/patients/${patient.id}/notes`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          staffUser: "Clinic staff",
+          noteType,
+          content: noteContent,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      const savedNote = (await response.json()) as PatientTimelineNote;
+      setPatient((current) =>
+        current
+          ? {
+              ...current,
+              notesTimeline: [savedNote, ...(current.notesTimeline ?? [])],
+            }
+          : current,
+      );
+      setNoteContent("");
+      setNoteType("clinical");
+    } catch (error) {
+      console.error(error);
+      setErrorMessage(
+        error instanceof Error ? error.message : "Unable to save patient note.",
+      );
+    } finally {
+      setIsSavingNote(false);
+    }
+  }
+
   const affectedTeethCount = useMemo(
     () =>
       records.reduce(
@@ -612,6 +670,192 @@ export default function PatientDetailPage() {
                       ? ` • ${patient.emergencyContactPhone}`
                       : ""}
                   </p>
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-[28px] border border-white/80 bg-white/85 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
+              <div className="grid gap-4 lg:grid-cols-3">
+                <div className="rounded-3xl bg-slate-50 p-5 ring-1 ring-slate-200">
+                  <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
+                    Patient Profile
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-slate-700">
+                    Patient code: {patient.patientId}
+                  </p>
+                  <p className="text-sm leading-6 text-slate-700">
+                    Status: {patient.status}
+                  </p>
+                  <p className="text-sm leading-6 text-slate-700">
+                    Type: {patient.patientType}
+                  </p>
+                  <p className="text-sm leading-6 text-slate-500">
+                    Registered {formatDateLabel(patient.registrationDate)}
+                  </p>
+                </div>
+                <div className="rounded-3xl bg-slate-50 p-5 ring-1 ring-slate-200">
+                  <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
+                    Analytics
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-slate-700">
+                    Last visit: {formatDateLabel(patient.analytics?.lastVisit ?? patient.lastVisitDate)}
+                  </p>
+                  <p className="text-sm leading-6 text-slate-700">
+                    Total revenue: {currency(patient.analytics?.totalRevenue ?? 0)}
+                  </p>
+                  <p className="text-sm leading-6 text-slate-700">
+                    Most common treatment: {patient.analytics?.mostCommonTreatment || "Not set"}
+                  </p>
+                  <p className="text-sm leading-6 text-slate-500">
+                    Doctors: {(patient.analytics?.doctorsVisited ?? []).join(", ") || "Not set"}
+                  </p>
+                </div>
+                <div className="rounded-3xl bg-slate-50 p-5 ring-1 ring-slate-200">
+                  <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
+                    Visible Flags
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {patient.alertFlags.unpaidBills ? (
+                      <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+                        Unpaid bills
+                      </span>
+                    ) : null}
+                    {patient.alertFlags.highRiskMedical ? (
+                      <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-800">
+                        High-risk medical
+                      </span>
+                    ) : null}
+                    {patient.alertFlags.frequentNoShow ? (
+                      <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-800">
+                        Frequent no-show
+                      </span>
+                    ) : null}
+                    {patient.alertFlags.vip ? (
+                      <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
+                        VIP
+                      </span>
+                    ) : null}
+                    {!patient.alertFlags.unpaidBills &&
+                    !patient.alertFlags.highRiskMedical &&
+                    !patient.alertFlags.frequentNoShow &&
+                    !patient.alertFlags.vip ? (
+                      <span className="text-sm text-slate-600">No active alerts.</span>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-4 lg:grid-cols-3">
+                <div className="rounded-3xl bg-slate-50 p-5 ring-1 ring-slate-200">
+                  <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
+                    Files
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-slate-700">
+                    Documents: {patient.documents.length}
+                  </p>
+                  <p className="text-sm leading-6 text-slate-700">
+                    X-rays: {patient.xrays.length}
+                  </p>
+                  <p className="text-sm leading-6 text-slate-700">
+                    Insurance cards: {patient.insuranceCards.length}
+                  </p>
+                  <p className="text-sm leading-6 text-slate-700">
+                    Consent forms: {patient.consentForms.length}
+                  </p>
+                </div>
+                <div className="rounded-3xl bg-slate-50 p-5 ring-1 ring-slate-200">
+                  <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
+                    Family Links
+                  </p>
+                  {(patient.familyMembers ?? []).length === 0 ? (
+                    <p className="mt-2 text-sm text-slate-600">No linked family members.</p>
+                  ) : (
+                    (patient.familyMembers ?? []).map((member) => (
+                      <Link
+                        key={member.id}
+                        href={`/patients/${member.id}`}
+                        className="mt-2 block rounded-2xl bg-white px-3 py-3 text-sm text-slate-700 ring-1 ring-slate-200"
+                      >
+                        <p className="font-semibold text-slate-900">{member.fullName}</p>
+                        <p className="mt-1 text-xs text-slate-500">{member.patientId}</p>
+                      </Link>
+                    ))
+                  )}
+                </div>
+                <div className="rounded-3xl bg-slate-50 p-5 ring-1 ring-slate-200">
+                  <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
+                    Duplicate Check
+                  </p>
+                  {(patient.duplicateCandidates ?? []).length === 0 ? (
+                    <p className="mt-2 text-sm text-slate-600">No duplicate candidates detected.</p>
+                  ) : (
+                    (patient.duplicateCandidates ?? []).slice(0, 3).map((candidate) => (
+                      <div key={candidate.patientId} className="mt-2 rounded-2xl bg-white px-3 py-3 text-sm text-slate-700 ring-1 ring-slate-200">
+                        <p className="font-semibold text-slate-900">{candidate.fullName}</p>
+                        <p className="mt-1 text-xs text-slate-500">{candidate.reason}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-[28px] border border-white/80 bg-white/85 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+                <div className="rounded-3xl bg-slate-50 p-5 ring-1 ring-slate-200">
+                  <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
+                    Patient Notes Timeline
+                  </p>
+                  <div className="mt-4 space-y-3">
+                    {(patient.notesTimeline ?? []).length === 0 ? (
+                      <p className="text-sm text-slate-600">No timeline notes yet.</p>
+                    ) : (
+                      (patient.notesTimeline ?? []).map((note) => (
+                        <article key={note.id} className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-sm font-semibold text-slate-900">{note.staffUser}</p>
+                            <span className="rounded-full bg-sky-100 px-3 py-1 text-[11px] font-semibold text-sky-700">
+                              {note.noteType}
+                            </span>
+                          </div>
+                          <p className="mt-2 text-sm leading-6 text-slate-700">{note.content}</p>
+                          <p className="mt-2 text-xs uppercase tracking-[0.2em] text-slate-400">
+                            {formatDateLabel(note.createdAt)}
+                          </p>
+                        </article>
+                      ))
+                    )}
+                  </div>
+                </div>
+                <div className="rounded-3xl bg-slate-50 p-5 ring-1 ring-slate-200">
+                  <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
+                    Add Timeline Note
+                  </p>
+                  <select
+                    value={noteType}
+                    onChange={(event) => setNoteType(event.target.value as PatientTimelineNote["noteType"])}
+                    className="mt-4 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-sky-400"
+                  >
+                    {patientNoteTypeOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                  <textarea
+                    value={noteContent}
+                    onChange={(event) => setNoteContent(event.target.value)}
+                    placeholder="Clinical, admin, or warning note"
+                    className="mt-4 min-h-32 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-sky-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddNote}
+                    disabled={isSavingNote}
+                    className="mt-4 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                  >
+                    {isSavingNote ? "Saving Note..." : "Save Timeline Note"}
+                  </button>
                 </div>
               </div>
             </section>
