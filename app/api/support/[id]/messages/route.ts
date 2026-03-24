@@ -1,17 +1,68 @@
 import { ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
 
+import type { SupportAttachment } from "@/lib/clinic-types";
 import { getDatabase } from "@/lib/mongodb";
 import {
-  createSupportMessage,
+  appendSupportMessageAndUpdateTicket,
+  customerCanReply,
   getStaffSupportSession,
-  serializeSupportTicket,
+  loadSupportMessages,
   supportErrorResponse,
-  verifyPortalPatientAccess,
   type SupportTicketDocument,
+  verifyPortalPatientAccess,
 } from "@/lib/support";
 
 export const runtime = "nodejs";
+
+function parsePositiveInt(value: string | null, fallback: number) {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+export async function GET(
+  request: Request,
+  context: { params: Promise<{ id: string }> },
+) {
+  try {
+    const { id } = await context.params;
+
+    if (!ObjectId.isValid(id)) {
+      return NextResponse.json({ error: "Invalid support ticket id." }, { status: 400 });
+    }
+
+    const db = await getDatabase();
+    const ticket = await db
+      .collection<SupportTicketDocument>("supportTickets")
+      .findOne({ _id: new ObjectId(id) });
+
+    if (!ticket) {
+      return NextResponse.json({ error: "Support ticket not found." }, { status: 404 });
+    }
+
+    const staffSession = await getStaffSupportSession(request);
+    if (!staffSession) {
+      const { searchParams } = new URL(request.url);
+      const patient = await verifyPortalPatientAccess({
+        patientId: searchParams.get("patientId") ?? "",
+        portalDob: searchParams.get("portalDob") ?? "",
+      });
+
+      if (!patient || patient.id !== ticket.patientId) {
+        return NextResponse.json({ error: "Unauthorized support access." }, { status: 401 });
+      }
+    }
+
+    const { searchParams } = new URL(request.url);
+    const page = parsePositiveInt(searchParams.get("page"), 1);
+    const pageSize = parsePositiveInt(searchParams.get("pageSize"), 20);
+
+    return NextResponse.json(await loadSupportMessages(db, id, page, pageSize));
+  } catch (error) {
+    console.error("GET /api/support/[id]/messages failed", error);
+    return supportErrorResponse("Failed to load support messages.", error);
+  }
+}
 
 export async function POST(
   request: Request,
@@ -28,6 +79,7 @@ export async function POST(
       message?: string;
       patientId?: string;
       portalDob?: string;
+      attachments?: SupportAttachment[];
     };
 
     if (!payload.message?.trim()) {
@@ -43,33 +95,18 @@ export async function POST(
       return NextResponse.json({ error: "Support ticket not found." }, { status: 404 });
     }
 
-    const now = new Date().toISOString();
+    const attachments = Array.isArray(payload.attachments) ? payload.attachments : [];
     const staffSession = await getStaffSupportSession(request);
 
     if (staffSession) {
-      const nextMessage = createSupportMessage(
-        "staff",
-        staffSession.fullName,
-        payload.message.trim(),
-      );
-
-      const updatedTicket = await db
-        .collection<SupportTicketDocument>("supportTickets")
-        .findOneAndUpdate(
-        { _id: new ObjectId(id) },
-        {
-          $push: { messages: nextMessage },
-          $set: {
-            updatedAt: now,
-            lastMessageAt: now,
-            status: ticket.status === "closed" ? "closed" : "in-progress",
-          },
-        },
-          { returnDocument: "after" },
-        );
-
       return NextResponse.json(
-        serializeSupportTicket(updatedTicket as SupportTicketDocument & { _id: unknown }),
+        await appendSupportMessageAndUpdateTicket(db, ticket, {
+          senderType: "staff",
+          senderId: staffSession.userId,
+          senderName: staffSession.fullName,
+          message: payload.message,
+          attachments,
+        }),
       );
     }
 
@@ -82,30 +119,21 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized support access." }, { status: 401 });
     }
 
-    if (ticket.status === "resolved" || ticket.status === "closed") {
+    if (!customerCanReply(ticket.status)) {
       return NextResponse.json(
-        { error: "Resolved or closed tickets cannot receive new patient replies." },
+        { error: "Closed tickets cannot receive new customer replies." },
         { status: 400 },
       );
     }
 
-    const nextMessage = createSupportMessage("patient", patient.fullName, payload.message.trim());
-    const updatedTicket = await db
-      .collection<SupportTicketDocument>("supportTickets")
-      .findOneAndUpdate(
-      { _id: new ObjectId(id) },
-      {
-        $push: { messages: nextMessage },
-        $set: {
-          updatedAt: now,
-          lastMessageAt: now,
-        },
-      },
-        { returnDocument: "after" },
-      );
-
     return NextResponse.json(
-      serializeSupportTicket(updatedTicket as SupportTicketDocument & { _id: unknown }),
+      await appendSupportMessageAndUpdateTicket(db, ticket, {
+        senderType: "patient",
+        senderId: patient.id,
+        senderName: patient.fullName,
+        message: payload.message,
+        attachments,
+      }),
     );
   } catch (error) {
     console.error("POST /api/support/[id]/messages failed", error);

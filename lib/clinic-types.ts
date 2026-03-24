@@ -201,11 +201,17 @@ export type NotificationCategory =
   | "appointment-reminder"
   | "appointment-confirmation"
   | "payment-reminder"
-  | "follow-up-reminder";
+  | "follow-up-reminder"
+  | "support-new-ticket"
+  | "support-new-message"
+  | "support-assignment"
+  | "support-status"
+  | "support-sla-warning"
+  | "support-sla-breach";
 
-export type NotificationChannel = "sms" | "email";
+export type NotificationChannel = "sms" | "email" | "in-app";
 
-export type NotificationStatus = "queued" | "sent";
+export type NotificationStatus = "queued" | "sent" | "read";
 
 export type NotificationRecord = {
   id: string;
@@ -224,7 +230,13 @@ export type NotificationRecord = {
 
 export type NotificationFormState = Omit<NotificationRecord, "id" | "status">;
 
-export type StaffRole = "dentist" | "receptionist" | "nurse" | "admin" | "manager";
+export type StaffRole =
+  | "dentist"
+  | "receptionist"
+  | "nurse"
+  | "admin"
+  | "manager"
+  | "support-agent";
 
 export type StaffScheduleDay = {
   day: string;
@@ -248,38 +260,181 @@ export type StaffFormState = Omit<StaffMember, "id" | "schedule" | "permissions"
   permissionsText: string;
 };
 
-export type SupportCategory = "general" | "billing" | "appointment";
+export type SupportCategory = string;
 
-export type SupportPriority = "low" | "medium" | "high";
+export type SupportPriority = "low" | "medium" | "high" | "urgent";
 
-export type SupportStatus = "open" | "in-progress" | "resolved" | "closed";
+export type SupportStatus = "open" | "pending" | "in-progress" | "resolved" | "closed";
+
+export type SupportSourceChannel =
+  | "portal"
+  | "support-center"
+  | "future-email"
+  | "future-chat";
+
+export type SupportSlaState = "on-track" | "warning" | "breached" | "met";
+
+export type SupportAttachment = {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  url: string;
+  uploadedAt: string;
+ };
 
 export type SupportMessage = {
   id: string;
-  senderType: "patient" | "staff";
+  ticketId: string;
+  senderType: "patient" | "staff" | "system";
   senderName: string;
   message: string;
   createdAt: string;
+  attachments: SupportAttachment[];
+  isInternal: boolean;
 };
 
 export type SupportTicket = {
   id: string;
+  ticketNumber: string;
   patientId: string;
   patientName: string;
+  patientEmail: string;
+  patientPhone: string;
   subject: string;
   category: SupportCategory;
   priority: SupportPriority;
   status: SupportStatus;
+  tags: string[];
+  assignedAgentId: string;
+  assignedAgentName: string;
+  assignedTeam: string;
+  sourceChannel: SupportSourceChannel;
   createdAt: string;
   updatedAt: string;
   lastMessageAt: string;
+  firstResponseAt: string;
+  resolvedAt: string;
+  closedAt: string;
+  lastCustomerReplyAt: string;
+  lastAgentReplyAt: string;
+  unreadForCustomer: number;
+  unreadForStaff: number;
+  feedbackRating: number | null;
+  feedbackComment: string;
+  latestMessagePreview: string;
+  messageCount: number;
+  notesCount: number;
+  sla: {
+    firstResponseDueAt: string;
+    resolutionDueAt: string;
+    firstResponseState: SupportSlaState;
+    resolutionState: SupportSlaState;
+  };
   messages: SupportMessage[];
+  internalNotes?: SupportNote[];
+  auditTrail?: SupportAuditLog[];
+};
+
+export type SupportNote = {
+  id: string;
+  ticketId: string;
+  authorId: string;
+  authorName: string;
+  message: string;
+  createdAt: string;
+  attachments: SupportAttachment[];
+};
+
+export type SupportAuditLog = {
+  id: string;
+  ticketId: string;
+  action:
+    | "ticket-created"
+    | "message-sent"
+    | "note-added"
+    | "assignment-changed"
+    | "status-changed"
+    | "priority-changed"
+    | "tags-changed"
+    | "feedback-submitted"
+    | "ticket-deleted";
+  actorId: string;
+  actorName: string;
+  actorType: "patient" | "staff" | "system";
+  createdAt: string;
+  details: string;
+};
+
+export type SupportTag = {
+  id: string;
+  name: string;
+  color: string;
+  createdAt: string;
+};
+
+export type SupportFaqArticle = {
+  id: string;
+  title: string;
+  body: string;
+  category: string;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SupportSavedReply = {
+  id: string;
+  title: string;
+  body: string;
+  category: string;
+  createdAt: string;
+};
+
+export type SupportSlaSettings = {
+  firstResponseMinutesByPriority: Record<SupportPriority, number>;
+  resolutionHoursByPriority: Record<SupportPriority, number>;
+  warningMinutesBeforeBreach: number;
+};
+
+export type SupportTicketListResponse = {
+  tickets: SupportTicket[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
+export type SupportMessageListResponse = {
+  messages: SupportMessage[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
+export type SupportDashboardData = {
+  totalTickets: number;
+  openTickets: number;
+  pendingTickets: number;
+  inProgressTickets: number;
+  resolvedTickets: number;
+  closedTickets: number;
+  activeAgents: number;
+  firstResponseAverageMinutes: number;
+  resolutionAverageHours: number;
+  slaWarningCount: number;
+  slaBreachedCount: number;
+  csatAverage: number;
+  ticketsPerDay: Array<{ date: string; count: number }>;
+  ticketsByCategory: Array<{ category: string; count: number }>;
+  ticketsByTag: Array<{ tag: string; count: number }>;
+  workloadByAgent: Array<{ agentId: string; agentName: string; count: number }>;
 };
 
 export type SupportTicketFormState = {
   subject: string;
   category: SupportCategory;
   message: string;
+  attachments: SupportAttachment[];
 };
 
 export const dentists = ["Dr. Lina", "Dr. Sreypov", "Dr. Dara", "Dr. Michael"];
@@ -535,6 +690,7 @@ export const staffRoleOptions: StaffRole[] = [
   "nurse",
   "admin",
   "manager",
+  "support-agent",
 ];
 
 export const staffPermissionOptions = [
@@ -545,18 +701,25 @@ export const staffPermissionOptions = [
   "emr-manage",
   "report-view",
   "support-manage",
+  "support-settings",
+  "support-delete",
 ];
 
 export const supportCategoryOptions: SupportCategory[] = [
   "general",
   "billing",
   "appointment",
+  "payment",
+  "bug",
+  "login",
+  "feature-request",
 ];
 
-export const supportPriorityOptions: SupportPriority[] = ["low", "medium", "high"];
+export const supportPriorityOptions: SupportPriority[] = ["low", "medium", "high", "urgent"];
 
 export const supportStatusOptions: SupportStatus[] = [
   "open",
+  "pending",
   "in-progress",
   "resolved",
   "closed",
@@ -566,6 +729,7 @@ export const initialSupportTicketForm: SupportTicketFormState = {
   subject: "",
   category: "general",
   message: "",
+  attachments: [],
 };
 
 export const defaultWeeklySchedule: StaffScheduleDay[] = [

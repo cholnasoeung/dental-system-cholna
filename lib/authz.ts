@@ -17,6 +17,8 @@ export function canAccessPath(
   if (
     pathname.startsWith("/login") ||
     pathname.startsWith("/register") ||
+    pathname.startsWith("/forgot-password") ||
+    pathname.startsWith("/reset-password") ||
     pathname.startsWith("/unauthorized") ||
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/portal")

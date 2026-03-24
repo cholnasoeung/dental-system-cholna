@@ -57,6 +57,8 @@ function buildMessage(
       return `Hello ${patientName}, this is your follow-up reminder for ${context.date}. ${
         context.treatment ? `Related treatment: ${context.treatment}.` : ""
       }`;
+    default:
+      return `Notification for ${patientName}.`;
   }
 }
 
@@ -70,6 +72,8 @@ function categoryLabel(category: NotificationCategory) {
       return "Payment Reminder";
     case "follow-up-reminder":
       return "Follow-up Reminder";
+    default:
+      return category;
   }
 }
 

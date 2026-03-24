@@ -91,6 +91,14 @@ function LoginPageContent() {
               className="w-full rounded-md border border-gray-300 px-3 py-2 outline-none focus:border-gray-500"
               placeholder="Enter your password"
             />
+            <div className="mt-2 text-right">
+              <Link
+                href="/forgot-password"
+                className="text-sm font-medium text-black underline"
+              >
+                Forgot password?
+              </Link>
+            </div>
           </div>
 
           {errorMessage ? (

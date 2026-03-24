@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 
 import {
   type Appointment,
@@ -8,7 +8,10 @@ import {
   type Invoice,
   type PatientProfile,
   type Prescription,
+  type SupportAttachment,
+  type SupportFaqArticle,
   type SupportTicket,
+  type SupportTicketListResponse,
   initialSupportTicketForm,
   supportCategoryOptions,
 } from "@/lib/clinic-types";
@@ -44,20 +47,18 @@ function invoicePaid(invoice: Invoice) {
 }
 
 function supportCategoryLabel(category: SupportTicket["category"]) {
-  switch (category) {
-    case "general":
-      return "General";
-    case "billing":
-      return "Billing";
-    case "appointment":
-      return "Appointment";
-  }
+  return category
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function supportStatusTone(status: SupportTicket["status"]) {
   switch (status) {
     case "open":
       return "bg-amber-100 text-amber-800";
+    case "pending":
+      return "bg-violet-100 text-violet-800";
     case "in-progress":
       return "bg-sky-100 text-sky-800";
     case "resolved":
@@ -65,6 +66,30 @@ function supportStatusTone(status: SupportTicket["status"]) {
     case "closed":
       return "bg-slate-200 text-slate-700";
   }
+}
+
+async function uploadCustomerFiles(files: File[], patientId: string, portalDob: string) {
+  const uploads: SupportAttachment[] = [];
+
+  for (const file of files) {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("patientId", patientId);
+    formData.append("portalDob", portalDob);
+
+    const response = await fetch("/api/support/uploads", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error("Attachment upload failed.");
+    }
+
+    uploads.push((await response.json()) as SupportAttachment);
+  }
+
+  return uploads;
 }
 
 export default function PortalPage() {
@@ -85,11 +110,30 @@ export default function PortalPage() {
     useState<SupportTicket | null>(null);
   const [supportForm, setSupportForm] = useState(initialSupportTicketForm);
   const [supportReply, setSupportReply] = useState("");
+  const [supportFiles, setSupportFiles] = useState<File[]>([]);
+  const [supportReplyFiles, setSupportReplyFiles] = useState<File[]>([]);
+  const [supportCategories, setSupportCategories] = useState(supportCategoryOptions);
+  const [supportFaqArticles, setSupportFaqArticles] = useState<SupportFaqArticle[]>([]);
+  const [feedbackRating, setFeedbackRating] = useState("5");
+  const [feedbackComment, setFeedbackComment] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isLoadingSupport, setIsLoadingSupport] = useState(false);
   const [isSavingSupport, setIsSavingSupport] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+
+  const suggestedSupportFaq = useMemo(() => {
+    const query = `${supportForm.subject} ${supportForm.message}`.trim().toLowerCase();
+    if (!query) {
+      return supportFaqArticles.slice(0, 3);
+    }
+
+    return supportFaqArticles
+      .filter((article) =>
+        `${article.title} ${article.body} ${article.tags.join(" ")}`.toLowerCase().includes(query),
+      )
+      .slice(0, 3);
+  }, [supportFaqArticles, supportForm.message, supportForm.subject]);
 
   useEffect(() => {
     async function loadPortalData() {
@@ -103,12 +147,16 @@ export default function PortalPage() {
           recordsResponse,
           invoicesResponse,
           prescriptionsResponse,
+          categoriesResponse,
+          faqResponse,
         ] = await Promise.all([
           fetch("/api/patients", { cache: "no-store" }),
           fetch("/api/appointments", { cache: "no-store" }),
           fetch("/api/emr", { cache: "no-store" }),
           fetch("/api/billing", { cache: "no-store" }),
           fetch("/api/prescriptions", { cache: "no-store" }),
+          fetch("/api/support/categories", { cache: "no-store" }),
+          fetch("/api/support/faq", { cache: "no-store" }),
         ]);
 
         if (
@@ -116,18 +164,30 @@ export default function PortalPage() {
           !appointmentsResponse.ok ||
           !recordsResponse.ok ||
           !invoicesResponse.ok ||
-          !prescriptionsResponse.ok
+          !prescriptionsResponse.ok ||
+          !categoriesResponse.ok ||
+          !faqResponse.ok
         ) {
           throw new Error("Failed to load patient portal data.");
         }
 
-        const [patientsData, appointmentsData, recordsData, invoicesData, prescriptionsData] =
+        const [
+          patientsData,
+          appointmentsData,
+          recordsData,
+          invoicesData,
+          prescriptionsData,
+          categoriesData,
+          faqData,
+        ] =
           await Promise.all([
             (await patientsResponse.json()) as PatientProfile[],
             (await appointmentsResponse.json()) as Appointment[],
             (await recordsResponse.json()) as DentalRecord[],
             (await invoicesResponse.json()) as Invoice[],
             (await prescriptionsResponse.json()) as Prescription[],
+            (await categoriesResponse.json()) as Array<{ id: string; name: string }>,
+            (await faqResponse.json()) as SupportFaqArticle[],
           ]);
 
         setPatients(patientsData);
@@ -135,6 +195,8 @@ export default function PortalPage() {
         setRecords(recordsData);
         setInvoices(invoicesData);
         setPrescriptions(prescriptionsData);
+        setSupportCategories(categoriesData.map((item) => item.name));
+        setSupportFaqArticles(faqData);
       } catch (error) {
         console.error(error);
         setErrorMessage("Unable to load patient portal data.");
@@ -169,14 +231,16 @@ export default function PortalPage() {
           throw new Error(await response.text());
         }
 
-        const data = (await response.json()) as SupportTicket[];
-        setSupportTickets(data);
+        const data = (await response.json()) as SupportTicketListResponse;
+        setSupportTickets(data.tickets);
         setSelectedSupportTicket((current) => {
           if (current) {
-            return data.find((ticket) => ticket.id === current.id) ?? data[0] ?? null;
+            return data.tickets.some((ticket) => ticket.id === current.id)
+              ? current
+              : data.tickets[0] ?? null;
           }
 
-          return data[0] ?? null;
+          return data.tickets[0] ?? null;
         });
       } catch (error) {
         console.error(error);
@@ -190,6 +254,38 @@ export default function PortalPage() {
 
     loadSupportTickets();
   }, [currentPatient, portalDob]);
+
+  useEffect(() => {
+    async function loadSelectedSupportTicket() {
+      if (!currentPatient || !portalDob || !selectedSupportTicket?.id) {
+        return;
+      }
+
+      try {
+        const params = new URLSearchParams({
+          patientId: currentPatient.id,
+          portalDob,
+        });
+        const response = await fetch(`/api/support/${selectedSupportTicket.id}?${params.toString()}`, {
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          throw new Error(await response.text());
+        }
+
+        const data = (await response.json()) as SupportTicket;
+        setSelectedSupportTicket(data);
+      } catch (error) {
+        console.error(error);
+        setErrorMessage(
+          error instanceof Error ? error.message : "Unable to load support ticket.",
+        );
+      }
+    }
+
+    void loadSelectedSupportTicket();
+  }, [currentPatient, portalDob, selectedSupportTicket?.id]);
 
   function handlePortalLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -274,6 +370,9 @@ export default function PortalPage() {
     try {
       setIsSavingSupport(true);
       setErrorMessage("");
+      const attachments = supportFiles.length > 0
+        ? await uploadCustomerFiles(supportFiles, currentPatient.id, portalDob)
+        : [];
 
       const response = await fetch("/api/support", {
         method: "POST",
@@ -286,6 +385,8 @@ export default function PortalPage() {
           subject: supportForm.subject,
           category: supportForm.category,
           message: supportForm.message,
+          sourceChannel: "portal",
+          attachments,
         }),
       });
 
@@ -297,6 +398,7 @@ export default function PortalPage() {
       setSupportTickets((current) => [nextTicket, ...current]);
       setSelectedSupportTicket(nextTicket);
       setSupportForm(initialSupportTicketForm);
+      setSupportFiles([]);
     } catch (error) {
       console.error(error);
       setErrorMessage(
@@ -317,6 +419,9 @@ export default function PortalPage() {
     try {
       setIsSavingSupport(true);
       setErrorMessage("");
+      const attachments = supportReplyFiles.length > 0
+        ? await uploadCustomerFiles(supportReplyFiles, currentPatient.id, portalDob)
+        : [];
 
       const response = await fetch(`/api/support/${selectedSupportTicket.id}/messages`, {
         method: "POST",
@@ -327,6 +432,7 @@ export default function PortalPage() {
           patientId: currentPatient.id,
           portalDob,
           message: supportReply,
+          attachments,
         }),
       });
 
@@ -341,10 +447,57 @@ export default function PortalPage() {
         ...current.filter((ticket) => ticket.id !== updatedTicket.id),
       ]);
       setSupportReply("");
+      setSupportReplyFiles([]);
     } catch (error) {
       console.error(error);
       setErrorMessage(
         error instanceof Error ? error.message : "Support reply could not be sent.",
+      );
+    } finally {
+      setIsSavingSupport(false);
+    }
+  }
+
+  async function handleSupportFeedback(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!currentPatient || !portalDob || !selectedSupportTicket) {
+      return;
+    }
+
+    try {
+      setIsSavingSupport(true);
+      setErrorMessage("");
+
+      const response = await fetch(`/api/support/${selectedSupportTicket.id}/feedback`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          patientId: currentPatient.id,
+          portalDob,
+          rating: Number(feedbackRating),
+          comment: feedbackComment,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      const updatedTicket = (await response.json()) as SupportTicket;
+      setSelectedSupportTicket(updatedTicket);
+      setSupportTickets((current) => [
+        updatedTicket,
+        ...current.filter((ticket) => ticket.id !== updatedTicket.id),
+      ]);
+      setFeedbackComment("");
+      setFeedbackRating("5");
+    } catch (error) {
+      console.error(error);
+      setErrorMessage(
+        error instanceof Error ? error.message : "Support feedback could not be saved.",
       );
     } finally {
       setIsSavingSupport(false);
@@ -770,7 +923,7 @@ export default function PortalPage() {
                     }
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400"
                   >
-                    {supportCategoryOptions.map((category) => (
+                    {supportCategories.map((category) => (
                       <option key={category} value={category}>
                         {supportCategoryLabel(category)}
                       </option>
@@ -791,6 +944,15 @@ export default function PortalPage() {
                     className="min-h-28 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400"
                   />
                 </label>
+                <label className="space-y-1">
+                  <span className="text-sm font-medium text-slate-700">Attachments</span>
+                  <input
+                    type="file"
+                    multiple
+                    onChange={(event) => setSupportFiles(Array.from(event.target.files ?? []))}
+                    className="block w-full text-sm text-slate-500"
+                  />
+                </label>
               </div>
               <button
                 type="submit"
@@ -799,6 +961,17 @@ export default function PortalPage() {
               >
                 {isSavingSupport ? "Sending..." : "Send Ticket"}
               </button>
+              {suggestedSupportFaq.length > 0 ? (
+                <div className="mt-5 space-y-3">
+                  <p className="text-sm font-semibold text-slate-900">Suggested help articles</p>
+                  {suggestedSupportFaq.map((article) => (
+                    <article key={article.id} className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
+                      <p className="font-semibold text-slate-900">{article.title}</p>
+                      <p className="mt-2 text-sm text-slate-600">{article.body}</p>
+                    </article>
+                  ))}
+                </div>
+              ) : null}
             </form>
 
             <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
@@ -821,9 +994,12 @@ export default function PortalPage() {
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
+                          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">
+                            {ticket.ticketNumber}
+                          </p>
                           <p className="font-semibold text-slate-900">{ticket.subject}</p>
                           <p className="mt-1 text-sm text-slate-500">
-                            {supportCategoryLabel(ticket.category)}
+                            {supportCategoryLabel(ticket.category)} | {ticket.unreadForCustomer} unread
                           </p>
                         </div>
                         <span
@@ -852,7 +1028,7 @@ export default function PortalPage() {
                         </h3>
                         <p className="mt-1 text-sm text-slate-500">
                           {supportCategoryLabel(selectedSupportTicket.category)} | Priority{" "}
-                          {selectedSupportTicket.priority}
+                          {selectedSupportTicket.priority} | {selectedSupportTicket.ticketNumber}
                         </p>
                       </div>
                       <span
@@ -890,10 +1066,10 @@ export default function PortalPage() {
                                   ? "text-slate-400"
                                   : "text-cyan-200"
                               }`}
-                            >
-                              {formatDateLabel(message.createdAt)}
-                            </p>
-                          </div>
+                          >
+                            {formatDateLabel(message.createdAt)}
+                          </p>
+                        </div>
                           <p
                             className={`mt-3 text-sm leading-6 ${
                               message.senderType === "patient"
@@ -903,12 +1079,29 @@ export default function PortalPage() {
                           >
                             {message.message}
                           </p>
+                          {message.attachments.length > 0 ? (
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {message.attachments.map((attachment) => (
+                                <a
+                                  key={attachment.id}
+                                  href={attachment.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700"
+                                >
+                                  {attachment.name}
+                                </a>
+                              ))}
+                            </div>
+                          ) : null}
                         </article>
                       ))}
                     </div>
 
                     {selectedSupportTicket.status === "open" ||
-                    selectedSupportTicket.status === "in-progress" ? (
+                    selectedSupportTicket.status === "in-progress" ||
+                    selectedSupportTicket.status === "pending" ||
+                    selectedSupportTicket.status === "resolved" ? (
                       <form className="mt-5 space-y-3" onSubmit={handleSupportReply}>
                         <label className="space-y-1">
                           <span className="text-sm font-medium text-slate-700">
@@ -921,6 +1114,14 @@ export default function PortalPage() {
                             className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400"
                           />
                         </label>
+                        <input
+                          type="file"
+                          multiple
+                          onChange={(event) =>
+                            setSupportReplyFiles(Array.from(event.target.files ?? []))
+                          }
+                          className="block w-full text-sm text-slate-500"
+                        />
                         <button
                           type="submit"
                           disabled={isSavingSupport}
@@ -934,6 +1135,48 @@ export default function PortalPage() {
                         This ticket is {selectedSupportTicket.status}. New patient replies are disabled.
                       </p>
                     )}
+
+                    {(selectedSupportTicket.status === "resolved" ||
+                      selectedSupportTicket.status === "closed") && !selectedSupportTicket.feedbackRating ? (
+                      <form className="mt-5 space-y-3" onSubmit={handleSupportFeedback}>
+                        <label className="space-y-1">
+                          <span className="text-sm font-medium text-slate-700">Rating</span>
+                          <select
+                            value={feedbackRating}
+                            onChange={(event) => setFeedbackRating(event.target.value)}
+                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400"
+                          >
+                            {[5, 4, 3, 2, 1].map((rating) => (
+                              <option key={rating} value={rating}>
+                                {rating} star{rating === 1 ? "" : "s"}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <textarea
+                          value={feedbackComment}
+                          onChange={(event) => setFeedbackComment(event.target.value)}
+                          placeholder="Tell us how we did."
+                          className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400"
+                        />
+                        <button
+                          type="submit"
+                          disabled={isSavingSupport}
+                          className="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                        >
+                          Submit Feedback
+                        </button>
+                      </form>
+                    ) : null}
+
+                    {selectedSupportTicket.feedbackRating ? (
+                      <p className="mt-5 rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700 ring-1 ring-emerald-100">
+                        Feedback submitted: {selectedSupportTicket.feedbackRating}/5
+                        {selectedSupportTicket.feedbackComment
+                          ? ` - ${selectedSupportTicket.feedbackComment}`
+                          : ""}
+                      </p>
+                    ) : null}
                   </>
                 ) : (
                   <p className="rounded-2xl bg-white p-4 text-sm text-slate-600 ring-1 ring-slate-200">

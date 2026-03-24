@@ -9,6 +9,8 @@ export const runtime = "nodejs";
 
 type StaffAuthDocument = Omit<StaffMember, "id"> & {
   passwordHash?: string;
+  passwordResetTokenHash?: string;
+  passwordResetTokenExpiresAt?: Date;
   _id?: string;
 };
 

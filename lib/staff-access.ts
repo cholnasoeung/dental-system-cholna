@@ -13,7 +13,10 @@ export function getDefaultPermissionsForRole(role: StaffMember["role"]) {
         "emr-manage",
         "report-view",
         "support-manage",
+        "support-settings",
       ];
+    case "support-agent":
+      return ["support-manage", "report-view"];
     case "dentist":
       return ["patient-read", "appointment-manage", "emr-manage"];
     case "nurse":

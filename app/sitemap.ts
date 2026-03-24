@@ -6,6 +6,8 @@ const routes = [
   "",
   "/login",
   "/register",
+  "/forgot-password",
+  "/reset-password",
   "/patients",
   "/appointments",
   "/emr",

@@ -1,60 +1,76 @@
 import { NextResponse } from "next/server";
 
-import type { SupportTicket } from "@/lib/clinic-types";
+import type { SupportAttachment } from "@/lib/clinic-types";
 import { getDatabase } from "@/lib/mongodb";
 import {
-  createSupportMessage,
+  buildSupportListResponse,
+  buildSupportSearchQuery,
+  createSupportTicketRecord,
   getStaffSupportSession,
   isSupportCategory,
-  serializeSupportTicket,
+  seedSupportMetadata,
   supportErrorResponse,
-  type PortalAccess,
   type SupportTicketDocument,
   verifyPortalPatientAccess,
 } from "@/lib/support";
 
 export const runtime = "nodejs";
 
+function parsePositiveInt(value: string | null, fallback: number) {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 export async function GET(request: Request) {
   try {
-    const staffSession = await getStaffSupportSession(request);
     const db = await getDatabase();
+    await seedSupportMetadata(db);
+
+    const { searchParams } = new URL(request.url);
+    const page = parsePositiveInt(searchParams.get("page"), 1);
+    const pageSize = parsePositiveInt(searchParams.get("pageSize"), 20);
+    const ticketsCollection = db.collection<SupportTicketDocument>("supportTickets");
+    const staffSession = await getStaffSupportSession(request);
 
     if (staffSession) {
-      const tickets = await db
-        .collection<SupportTicketDocument>("supportTickets")
-        .find({})
-        .sort({ lastMessageAt: -1, updatedAt: -1, _id: -1 })
-        .toArray();
+      const query = buildSupportSearchQuery(searchParams);
+      const [tickets, total] = await Promise.all([
+        ticketsCollection
+          .find(query)
+          .sort({ lastMessageAt: -1, updatedAt: -1, _id: -1 })
+          .skip((page - 1) * pageSize)
+          .limit(pageSize)
+          .toArray(),
+        ticketsCollection.countDocuments(query),
+      ]);
 
       return NextResponse.json(
-        tickets.map((ticket) =>
-          serializeSupportTicket(ticket as SupportTicketDocument & { _id: unknown }),
-        ),
+        await buildSupportListResponse(db, tickets, total, page, pageSize),
       );
     }
 
-    const { searchParams } = new URL(request.url);
-    const access: PortalAccess = {
+    const patient = await verifyPortalPatientAccess({
       patientId: searchParams.get("patientId") ?? "",
       portalDob: searchParams.get("portalDob") ?? "",
-    };
-    const patient = await verifyPortalPatientAccess(access);
+    });
 
     if (!patient) {
       return NextResponse.json({ error: "Unauthorized support access." }, { status: 401 });
     }
 
-    const tickets = await db
-      .collection<SupportTicketDocument>("supportTickets")
-      .find({ patientId: patient.id })
-      .sort({ lastMessageAt: -1, updatedAt: -1, _id: -1 })
-      .toArray();
+    const query = { patientId: patient.id };
+    const [tickets, total] = await Promise.all([
+      ticketsCollection
+        .find(query)
+        .sort({ lastMessageAt: -1, updatedAt: -1, _id: -1 })
+        .skip((page - 1) * pageSize)
+        .limit(pageSize)
+        .toArray(),
+      ticketsCollection.countDocuments(query),
+    ]);
 
     return NextResponse.json(
-      tickets.map((ticket) =>
-        serializeSupportTicket(ticket as SupportTicketDocument & { _id: unknown }),
-      ),
+      await buildSupportListResponse(db, tickets, total, page, pageSize),
     );
   } catch (error) {
     console.error("GET /api/support failed", error);
@@ -70,6 +86,8 @@ export async function POST(request: Request) {
       subject?: string;
       category?: string;
       message?: string;
+      sourceChannel?: "portal" | "support-center";
+      attachments?: SupportAttachment[];
     };
 
     if (!payload.patientId || !payload.portalDob) {
@@ -105,34 +123,20 @@ export async function POST(request: Request) {
       );
     }
 
-    const now = new Date().toISOString();
-    const ticketPayload: Omit<SupportTicket, "id"> = {
+    const db = await getDatabase();
+    const ticket = await createSupportTicketRecord(db, {
       patientId: patient.id,
       patientName: patient.fullName,
-      subject: payload.subject.trim(),
+      patientEmail: patient.email,
+      patientPhone: patient.phone,
+      subject: payload.subject,
       category: payload.category,
-      priority: "medium",
-      status: "open",
-      createdAt: now,
-      updatedAt: now,
-      lastMessageAt: now,
-      messages: [
-        createSupportMessage("patient", patient.fullName, payload.message.trim()),
-      ],
-    };
+      message: payload.message,
+      sourceChannel: payload.sourceChannel ?? "portal",
+      attachments: Array.isArray(payload.attachments) ? payload.attachments : [],
+    });
 
-    const db = await getDatabase();
-    const result = await db
-      .collection<Omit<SupportTicket, "id">>("supportTickets")
-      .insertOne(ticketPayload);
-
-    return NextResponse.json(
-      {
-        id: String(result.insertedId),
-        ...ticketPayload,
-      },
-      { status: 201 },
-    );
+    return NextResponse.json(ticket, { status: 201 });
   } catch (error) {
     console.error("POST /api/support failed", error);
     return supportErrorResponse("Failed to create support ticket.", error);
