@@ -66,7 +66,7 @@ export async function POST(request: Request) {
     const assignedRole: StaffMember["role"] = isFirstUser ? "admin" : selectedRole;
     const permissions = isFirstUser
       ? [...staffPermissionOptions]
-      : getDefaultPermissionsForRole(assignedRole);
+      : (getDefaultPermissionsForRole(assignedRole) ?? []);
 
     const payload: Omit<StaffAuthDocument, "_id"> = {
       fullName,
@@ -74,6 +74,7 @@ export async function POST(request: Request) {
       email: normalizedEmail,
       phone: "",
       permissions,
+      skills: [],
       schedule: [],
       availabilityStatus: "available",
       passwordHash: hashPassword(password),

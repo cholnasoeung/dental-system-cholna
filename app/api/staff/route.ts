@@ -16,6 +16,7 @@ function serializeStaff(member: StaffDocument & { _id: unknown }): StaffMember {
     email: member.email,
     phone: member.phone,
     permissions: member.permissions ?? [],
+    skills: member.skills ?? [],
     schedule: member.schedule ?? [],
     availabilityStatus: member.availabilityStatus,
   };

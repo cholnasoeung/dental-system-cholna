@@ -15,6 +15,7 @@ function roleLabel(role: StaffRole) {
 
 const roleDescriptions: Record<StaffRole, string> = {
   dentist: "Clinical access for treatment history, EMR, and appointment workflows.",
+  hygienist: "Preventive care access for hygiene visits, cleanings, and chair-based scheduling.",
   receptionist: "Front-desk access for patients, billing, appointments, and support.",
   nurse: "Clinical support access for patient care and EMR assistance.",
   admin: "Full platform control across operations, staff, reports, and support.",

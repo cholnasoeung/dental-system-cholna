@@ -19,6 +19,8 @@ export function getDefaultPermissionsForRole(role: StaffMember["role"]) {
       return ["support-manage", "report-view"];
     case "dentist":
       return ["patient-read", "appointment-manage", "emr-manage"];
+    case "hygienist":
+      return ["patient-read", "appointment-manage", "emr-manage"];
     case "nurse":
       return ["patient-read", "appointment-manage", "emr-manage"];
     case "receptionist":
@@ -28,5 +30,7 @@ export function getDefaultPermissionsForRole(role: StaffMember["role"]) {
         "billing-manage",
         "support-manage",
       ];
+    default:
+      return [];
   }
 }

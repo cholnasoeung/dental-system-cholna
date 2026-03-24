@@ -169,38 +169,194 @@ export type AppointmentStatus =
   | "scheduled"
   | "confirmed"
   | "checked-in"
+  | "in-progress"
   | "completed"
   | "canceled"
-  | "no-show";
+  | "no-show"
+  | "rescheduled";
 
 export type ReminderChannel = "sms" | "email" | "both";
 
-export type Appointment = {
+export type AppointmentPriority = "urgent" | "normal";
+
+export type AppointmentQueueMode = "booked" | "waitlist" | "walk-in";
+
+export type ChairStatus = "available" | "occupied" | "cleaning" | "maintenance";
+
+export type RecurrenceType = "daily" | "weekly" | "monthly";
+
+export type ProcedureCategory =
+  | "cleaning"
+  | "filling"
+  | "root-canal"
+  | "braces"
+  | "consultation"
+  | "extraction"
+  | "implant"
+  | "xray";
+
+export type Branch = {
+  id: string;
+  name: string;
+};
+
+export type Chair = {
+  id: string;
+  name: string;
+  roomId: string;
+  branchId: string;
+  status: ChairStatus;
+};
+
+export type ProcedureCatalogItem = {
+  id: string;
+  name: string;
+  category: ProcedureCategory;
+  durationMinutes: number;
+  defaultPrice: number;
+  pricingModel: TreatmentPricingModel;
+  requiredSkills: string[];
+  allowedChairIds: string[];
+  requiredMaterials: string[];
+  patientInstructions: string;
+  suggestedFollowUpDays: number;
+};
+
+export type AppointmentProcedure = {
+  procedureId: string;
+  name: string;
+  category: ProcedureCategory;
+  durationMinutes: number;
+  unitPrice: number;
+  pricingModel: TreatmentPricingModel;
+  requiredMaterials: string[];
+};
+
+export type AppointmentStatusHistoryEntry = {
+  id: string;
+  status: AppointmentStatus;
+  changedAt: string;
+  changedBy: string;
+  note: string;
+};
+
+export type AppointmentRecurrence = {
+  enabled: boolean;
+  type: RecurrenceType;
+  interval: number;
+  numberOfSessions: number;
+  groupId: string;
+  occurrenceNumber: number;
+};
+
+export type AppointmentConflict = {
+  type: "chair-overlap" | "dentist-overlap" | "capacity" | "skill";
+  message: string;
+};
+
+export type AppointmentWaitlistEntry = {
   id: string;
   patientId: string;
   patientName: string;
+  branchId: string;
+  preferredDate: string;
+  preferredStartTime: string;
+  priority: AppointmentPriority;
+  procedureIds: string[];
+  notes: string;
+  createdAt: string;
+  status: "waiting" | "promoted" | "cancelled";
+};
+
+export type AppointmentAnalytics = {
+  totalAppointments: number;
+  scheduledCount: number;
+  confirmedCount: number;
+  checkedInCount: number;
+  inProgressCount: number;
+  completedCount: number;
+  cancelledCount: number;
+  noShowCount: number;
+  rescheduledCount: number;
+  noShowRate: number;
+  cancellationRate: number;
+  busiestHours: Array<{ hour: string; count: number }>;
+  doctorUtilization: Array<{ dentistId: string; dentistName: string; minutes: number }>;
+};
+
+export type Appointment = {
+  id: string;
+  appointmentId: string;
+  patientId: string;
+  patientName: string;
+  dentistId: string;
   dentist: string;
+  assistantId: string;
+  assistantName: string;
+  hygienistId: string;
+  hygienistName: string;
+  branchId: string;
+  branchName: string;
+  chairId: string;
+  chairName: string;
+  roomId: string;
+  procedures: AppointmentProcedure[];
   date: string;
   time: string;
+  startTime: string;
+  endTime: string;
+  durationMinutes: number;
+  bufferMinutes: number;
   reason: string;
   status: AppointmentStatus;
+  queueMode: AppointmentQueueMode;
+  queueNumber: number | null;
+  priority: AppointmentPriority;
+  overbookingApproved: boolean;
   reminderDate: string;
   reminderChannel: ReminderChannel;
   followUpDate: string;
   notes: string;
+  preVisitNotes: string;
+  requiredMaterials: string[];
+  patientInstructions: string;
+  estimatedCost: number;
+  actualCost: number | null;
+  insuranceCoveragePreview: number | null;
+  linkedRecordId: string;
+  linkedInvoiceId: string;
+  recurrence: AppointmentRecurrence;
+  statusHistory: AppointmentStatusHistoryEntry[];
+  conflicts: AppointmentConflict[];
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type AppointmentFormState = {
   patientId: string;
-  dentist: string;
+  dentistId: string;
+  assistantId: string;
+  hygienistId: string;
+  branchId: string;
+  chairId: string;
+  procedureIds: string[];
   date: string;
-  time: string;
+  startTime: string;
   reason: string;
   status: AppointmentStatus;
+  queueMode: AppointmentQueueMode;
+  priority: AppointmentPriority;
   reminderDate: string;
   reminderChannel: ReminderChannel;
   followUpDate: string;
   notes: string;
+  preVisitNotes: string;
+  bufferMinutes: number;
+  overbookingApproved: boolean;
+  recurrenceEnabled: boolean;
+  recurrenceType: RecurrenceType;
+  recurrenceInterval: number;
+  recurrenceSessions: number;
 };
 
 export type ToothCondition =
@@ -347,6 +503,7 @@ export type MedicationItemFormState = MedicationItem;
 export type NotificationCategory =
   | "appointment-reminder"
   | "appointment-confirmation"
+  | "appointment-missed"
   | "payment-reminder"
   | "follow-up-reminder"
   | "support-new-ticket"
@@ -379,6 +536,7 @@ export type NotificationFormState = Omit<NotificationRecord, "id" | "status">;
 
 export type StaffRole =
   | "dentist"
+  | "hygienist"
   | "receptionist"
   | "nurse"
   | "admin"
@@ -399,6 +557,7 @@ export type StaffMember = {
   email: string;
   phone: string;
   permissions: string[];
+  skills?: string[];
   schedule: StaffScheduleDay[];
   availabilityStatus: "available" | "busy" | "off";
 };
@@ -586,22 +745,105 @@ export type SupportTicketFormState = {
 
 export const dentists = ["Dr. Lina", "Dr. Sreypov", "Dr. Dara", "Dr. Michael"];
 
+export const branchCatalog: Branch[] = [
+  { id: "main-branch", name: "Main Branch" },
+];
+
+export const chairCatalog: Chair[] = [
+  { id: "chair-a", name: "Chair A", roomId: "room-1", branchId: "main-branch", status: "available" },
+  { id: "chair-b", name: "Chair B", roomId: "room-2", branchId: "main-branch", status: "available" },
+  { id: "chair-c", name: "Chair C", roomId: "room-3", branchId: "main-branch", status: "cleaning" },
+  { id: "chair-d", name: "Chair D", roomId: "room-4", branchId: "main-branch", status: "maintenance" },
+];
+
+export const procedureCatalog: ProcedureCatalogItem[] = [
+  {
+    id: "consultation",
+    name: "Consultation",
+    category: "consultation",
+    durationMinutes: 30,
+    defaultPrice: 15,
+    pricingModel: "per-case",
+    requiredSkills: ["consultation"],
+    allowedChairIds: ["chair-a", "chair-b", "chair-c"],
+    requiredMaterials: ["mirror", "exam set"],
+    patientInstructions: "Bring previous dental records if available.",
+    suggestedFollowUpDays: 30,
+  },
+  {
+    id: "cleaning",
+    name: "Cleaning",
+    category: "cleaning",
+    durationMinutes: 45,
+    defaultPrice: 35,
+    pricingModel: "per-case",
+    requiredSkills: ["cleaning"],
+    allowedChairIds: ["chair-a", "chair-b"],
+    requiredMaterials: ["scaler", "polishing kit"],
+    patientInstructions: "Avoid staining foods for a few hours after treatment.",
+    suggestedFollowUpDays: 180,
+  },
+  {
+    id: "filling",
+    name: "Filling",
+    category: "filling",
+    durationMinutes: 60,
+    defaultPrice: 45,
+    pricingModel: "per-tooth",
+    requiredSkills: ["restorative", "filling"],
+    allowedChairIds: ["chair-a", "chair-b"],
+    requiredMaterials: ["composite kit", "etching gel"],
+    patientInstructions: "Avoid chewing hard foods until numbness wears off.",
+    suggestedFollowUpDays: 14,
+  },
+  {
+    id: "root-canal",
+    name: "Root Canal",
+    category: "root-canal",
+    durationMinutes: 90,
+    defaultPrice: 180,
+    pricingModel: "per-tooth",
+    requiredSkills: ["endodontics", "root-canal"],
+    allowedChairIds: ["chair-a", "chair-b"],
+    requiredMaterials: ["endo files", "rubber dam"],
+    patientInstructions: "Expect a longer visit and avoid chewing on the tooth after treatment.",
+    suggestedFollowUpDays: 7,
+  },
+  {
+    id: "braces-follow-up",
+    name: "Braces Follow-Up",
+    category: "braces",
+    durationMinutes: 40,
+    defaultPrice: 55,
+    pricingModel: "per-case",
+    requiredSkills: ["orthodontics", "braces"],
+    allowedChairIds: ["chair-b", "chair-c"],
+    requiredMaterials: ["orthodontic tools", "arch wires"],
+    patientInstructions: "Bring your elastics and report any loose brackets.",
+    suggestedFollowUpDays: 14,
+  },
+];
+
 export const statusOptions: AppointmentStatus[] = [
   "scheduled",
   "confirmed",
   "checked-in",
+  "in-progress",
   "completed",
   "canceled",
   "no-show",
+  "rescheduled",
 ];
 
 export const statusStyles: Record<AppointmentStatus, string> = {
   scheduled: "bg-amber-100 text-amber-800",
   confirmed: "bg-sky-100 text-sky-800",
   "checked-in": "bg-violet-100 text-violet-800",
+  "in-progress": "bg-cyan-100 text-cyan-800",
   completed: "bg-emerald-100 text-emerald-800",
   canceled: "bg-rose-100 text-rose-800",
   "no-show": "bg-slate-200 text-slate-700",
+  rescheduled: "bg-orange-100 text-orange-800",
 };
 
 export const initialPatientForm: PatientFormState = {
@@ -722,15 +964,29 @@ export const patientNoteTypeOptions: PatientNoteType[] = [
 
 export const initialAppointmentForm: AppointmentFormState = {
   patientId: "",
-  dentist: dentists[0],
+  dentistId: "",
+  assistantId: "",
+  hygienistId: "",
+  branchId: branchCatalog[0]?.id ?? "",
+  chairId: "",
+  procedureIds: ["consultation"],
   date: "",
-  time: "",
+  startTime: "",
   reason: "",
   status: "scheduled",
+  queueMode: "booked",
+  priority: "normal",
   reminderDate: "",
   reminderChannel: "sms",
   followUpDate: "",
   notes: "",
+  preVisitNotes: "",
+  bufferMinutes: 10,
+  overbookingApproved: false,
+  recurrenceEnabled: false,
+  recurrenceType: "weekly",
+  recurrenceInterval: 1,
+  recurrenceSessions: 1,
 };
 
 export const odontogramToothNumbers = [
@@ -969,6 +1225,7 @@ export const initialMedicationItemForm: MedicationItemFormState = {
 export const notificationCategoryOptions: NotificationCategory[] = [
   "appointment-reminder",
   "appointment-confirmation",
+  "appointment-missed",
   "payment-reminder",
   "follow-up-reminder",
 ];
@@ -990,6 +1247,7 @@ export const initialNotificationForm: NotificationFormState = {
 
 export const staffRoleOptions: StaffRole[] = [
   "dentist",
+  "hygienist",
   "receptionist",
   "nurse",
   "admin",

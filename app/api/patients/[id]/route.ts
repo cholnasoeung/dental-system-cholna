@@ -2,6 +2,7 @@ import { ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
 
 import type { Appointment, DentalRecord, Invoice, PatientProfile } from "@/lib/clinic-types";
+import { serializeAppointment } from "@/lib/appointments";
 import { getDatabase } from "@/lib/mongodb";
 import {
   buildPatientAnalytics,
@@ -57,20 +58,7 @@ export async function GET(
       return NextResponse.json({ error: "Patient not found." }, { status: 404 });
     }
 
-    const serializedAppointments = appointments.map((appointment) => ({
-      id: String(appointment._id),
-      patientId: appointment.patientId,
-      patientName: appointment.patientName,
-      dentist: appointment.dentist,
-      date: appointment.date,
-      time: appointment.time,
-      reason: appointment.reason,
-      status: appointment.status,
-      reminderDate: appointment.reminderDate,
-      reminderChannel: appointment.reminderChannel,
-      followUpDate: appointment.followUpDate,
-      notes: appointment.notes,
-    }));
+    const serializedAppointments = appointments.map((appointment) => serializeAppointment(appointment));
     const serializedInvoices = invoices.map((invoice) => ({
       id: String(invoice._id),
       patientId: invoice.patientId,
