@@ -90,8 +90,16 @@ export type OdontogramTooth = {
   notes: string;
   treatmentProcess: string;
   treatmentStatus: TreatmentStatus;
-  billableTreatmentId: string;
-  billableUnitPrice: number | null;
+  conditionPrice: number | null;
+};
+
+export type ToothConditionPricingItem = {
+  condition: ToothCondition;
+  label: string;
+  treatmentId: string;
+  treatment: string;
+  defaultPrice: number | null;
+  pricingModel: TreatmentPricingModel;
 };
 
 export type ClinicalAttachment = {
@@ -532,6 +540,65 @@ export const toothConditionOptions: ToothCondition[] = [
   "implant",
   "root-canal",
 ];
+
+export const toothConditionPricing: Record<ToothCondition, ToothConditionPricingItem> = {
+  healthy: {
+    condition: "healthy",
+    label: "Healthy",
+    treatmentId: "healthy",
+    treatment: "Healthy / Observation",
+    defaultPrice: null,
+    pricingModel: "per-tooth",
+  },
+  caries: {
+    condition: "caries",
+    label: "Caries",
+    treatmentId: "caries",
+    treatment: "Caries Treatment",
+    defaultPrice: 45,
+    pricingModel: "per-tooth",
+  },
+  filling: {
+    condition: "filling",
+    label: "Filling",
+    treatmentId: "filling",
+    treatment: "Composite Filling",
+    defaultPrice: 45,
+    pricingModel: "per-tooth",
+  },
+  crown: {
+    condition: "crown",
+    label: "Crown",
+    treatmentId: "crown",
+    treatment: "Dental Crown",
+    defaultPrice: 250,
+    pricingModel: "per-tooth",
+  },
+  missing: {
+    condition: "missing",
+    label: "Missing",
+    treatmentId: "missing",
+    treatment: "Missing Tooth Management",
+    defaultPrice: 60,
+    pricingModel: "per-tooth",
+  },
+  implant: {
+    condition: "implant",
+    label: "Implant",
+    treatmentId: "implant",
+    treatment: "Dental Implant",
+    defaultPrice: 900,
+    pricingModel: "per-tooth",
+  },
+  "root-canal": {
+    condition: "root-canal",
+    label: "Root Canal",
+    treatmentId: "root-canal",
+    treatment: "Root Canal Treatment",
+    defaultPrice: 180,
+    pricingModel: "per-tooth",
+  },
+};
 
 export const treatmentCatalog: TreatmentCatalogItem[] = [
   {

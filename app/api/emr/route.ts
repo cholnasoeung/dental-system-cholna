@@ -8,6 +8,21 @@ type DentalRecordDocument = Omit<DentalRecord, "id"> & {
   _id?: string;
 };
 
+type OdontogramToothDocument = DentalRecordDocument["odontogram"][number] & {
+  billableUnitPrice?: number | null;
+};
+
+function normalizeOdontogram(odontogram: OdontogramToothDocument[] = []) {
+  return odontogram.map((tooth) => ({
+    toothNumber: tooth.toothNumber,
+    condition: tooth.condition,
+    notes: tooth.notes ?? "",
+    treatmentProcess: tooth.treatmentProcess ?? "",
+    treatmentStatus: tooth.treatmentStatus ?? "planned",
+    conditionPrice: tooth.conditionPrice ?? tooth.billableUnitPrice ?? null,
+  }));
+}
+
 function serializeDentalRecord(
   record: DentalRecordDocument & { _id: unknown },
 ): DentalRecord {
@@ -24,15 +39,7 @@ function serializeDentalRecord(
     treatmentStatus: record.treatmentStatus ?? "planned",
     procedureHistory: record.procedureHistory,
     clinicalAttachments: record.clinicalAttachments ?? [],
-    odontogram: (record.odontogram ?? []).map((tooth) => ({
-      toothNumber: tooth.toothNumber,
-      condition: tooth.condition,
-      notes: tooth.notes ?? "",
-      treatmentProcess: tooth.treatmentProcess ?? "",
-      treatmentStatus: tooth.treatmentStatus ?? "planned",
-      billableTreatmentId: tooth.billableTreatmentId ?? "",
-      billableUnitPrice: tooth.billableUnitPrice ?? null,
-    })),
+    odontogram: normalizeOdontogram(record.odontogram as OdontogramToothDocument[]),
   };
 }
 
@@ -76,14 +83,18 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const payload = (await request.json()) as Omit<DentalRecord, "id">;
+    const normalizedPayload = {
+      ...payload,
+      odontogram: normalizeOdontogram(payload.odontogram as OdontogramToothDocument[]),
+    } satisfies Omit<DentalRecord, "id">;
     const db = await getDatabase();
     const result = await db
       .collection<Omit<DentalRecord, "id">>("emr_records")
-      .insertOne(payload);
+      .insertOne(normalizedPayload);
 
     const nextRecord = {
       id: String(result.insertedId),
-      ...payload,
+      ...normalizedPayload,
     } satisfies DentalRecord;
 
     await upsertAutoInvoiceForRecord(db, nextRecord);

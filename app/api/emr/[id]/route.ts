@@ -5,6 +5,21 @@ import { upsertAutoInvoiceForRecord } from "@/lib/billing";
 import type { DentalRecord } from "@/lib/clinic-types";
 import { getDatabase } from "@/lib/mongodb";
 
+type OdontogramToothDocument = DentalRecord["odontogram"][number] & {
+  billableUnitPrice?: number | null;
+};
+
+function normalizeOdontogram(odontogram: OdontogramToothDocument[] = []) {
+  return odontogram.map((tooth) => ({
+    toothNumber: tooth.toothNumber,
+    condition: tooth.condition,
+    notes: tooth.notes ?? "",
+    treatmentProcess: tooth.treatmentProcess ?? "",
+    treatmentStatus: tooth.treatmentStatus ?? "planned",
+    conditionPrice: tooth.conditionPrice ?? tooth.billableUnitPrice ?? null,
+  }));
+}
+
 function errorResponse(message: string, error: unknown) {
   return NextResponse.json(
     {
@@ -27,11 +42,19 @@ export async function PATCH(
   try {
     const { id } = await context.params;
     const payload = (await request.json()) as Partial<Omit<DentalRecord, "id">>;
+    const normalizedPayload = {
+      ...payload,
+      ...(payload.odontogram
+        ? {
+            odontogram: normalizeOdontogram(payload.odontogram as OdontogramToothDocument[]),
+          }
+        : {}),
+    } satisfies Partial<Omit<DentalRecord, "id">>;
     const db = await getDatabase();
 
     await db.collection("emr_records").updateOne(
       { _id: new ObjectId(id) },
-      { $set: payload },
+      { $set: normalizedPayload },
     );
 
     const updatedRecord = await db.collection<Omit<DentalRecord, "id">>("emr_records").findOne({
@@ -52,15 +75,7 @@ export async function PATCH(
         treatmentStatus: updatedRecord.treatmentStatus ?? "planned",
         procedureHistory: updatedRecord.procedureHistory,
         clinicalAttachments: updatedRecord.clinicalAttachments ?? [],
-        odontogram: (updatedRecord.odontogram ?? []).map((tooth) => ({
-          toothNumber: tooth.toothNumber,
-          condition: tooth.condition,
-          notes: tooth.notes ?? "",
-          treatmentProcess: tooth.treatmentProcess ?? "",
-          treatmentStatus: tooth.treatmentStatus ?? "planned",
-          billableTreatmentId: tooth.billableTreatmentId ?? "",
-          billableUnitPrice: tooth.billableUnitPrice ?? null,
-        })),
+        odontogram: normalizeOdontogram(updatedRecord.odontogram as OdontogramToothDocument[]),
       });
     }
 

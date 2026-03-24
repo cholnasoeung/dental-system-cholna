@@ -4,10 +4,9 @@ import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 
 import { AdminShell } from "@/components/admin-shell";
 import {
-  billableTreatmentIdsByCondition,
   initialDentalRecordForm,
   odontogramToothNumbers,
-  treatmentCatalog,
+  toothConditionPricing,
   treatmentStatusOptions,
   toothConditionOptions,
   type ClinicalAttachment,
@@ -84,14 +83,9 @@ function normalizeTooth(tooth: OdontogramTooth): OdontogramTooth {
     notes: tooth.notes ?? "",
     treatmentProcess: tooth.treatmentProcess ?? "",
     treatmentStatus: tooth.treatmentStatus ?? "planned",
-    billableTreatmentId: tooth.billableTreatmentId ?? "",
-    billableUnitPrice: tooth.billableUnitPrice ?? null,
+    conditionPrice:
+      tooth.conditionPrice ?? toothConditionPricing[tooth.condition]?.defaultPrice ?? null,
   };
-}
-
-function allowedTreatmentsForCondition(condition: ToothCondition) {
-  const allowedIds = billableTreatmentIdsByCondition[condition] ?? [];
-  return treatmentCatalog.filter((item) => allowedIds.includes(item.id));
 }
 
 function ToothIllustration({
@@ -317,8 +311,7 @@ export default function EmrPage() {
       notes: "",
       treatmentProcess: "",
       treatmentStatus: "planned",
-      billableTreatmentId: "",
-      billableUnitPrice: null,
+      conditionPrice: null,
     })),
   );
   const [selectedToothNumber, setSelectedToothNumber] = useState("11");
@@ -380,8 +373,7 @@ export default function EmrPage() {
       | "notes"
       | "treatmentProcess"
       | "treatmentStatus"
-      | "billableTreatmentId"
-      | "billableUnitPrice",
+      | "conditionPrice",
     value: string,
   ) {
     setOdontogram((current) =>
@@ -390,7 +382,7 @@ export default function EmrPage() {
           ? {
               ...tooth,
               [field]:
-                field === "billableUnitPrice"
+                field === "conditionPrice"
                   ? value === ""
                     ? null
                     : Number(value)
@@ -444,8 +436,7 @@ export default function EmrPage() {
           notes: "",
           treatmentProcess: "",
           treatmentStatus: "planned",
-          billableTreatmentId: "",
-          billableUnitPrice: null,
+          conditionPrice: null,
         })),
       );
       form.reset();
@@ -470,7 +461,7 @@ export default function EmrPage() {
   const selectedTooth = normalizeTooth(
     toothLookup.get(selectedToothNumber) ?? toothLookup.get("11") ?? odontogram[0],
   );
-  const allowedBillableTreatments = allowedTreatmentsForCondition(selectedTooth.condition);
+  const selectedToothPricing = toothConditionPricing[selectedTooth.condition];
 
   return (
     <AdminShell>
@@ -745,10 +736,10 @@ export default function EmrPage() {
                             {(selectedTooth.treatmentStatus ?? "planned").replace("-", " ")}
                           </span>
                           <p className="mt-2 text-xs font-medium uppercase tracking-[0.22em] text-slate-500">
-                            Billing:{" "}
-                            {treatmentCatalog.find(
-                              (item) => item.id === selectedTooth.billableTreatmentId,
-                            )?.name ?? "Not billable"}
+                            Pricing:{" "}
+                            {selectedTooth.conditionPrice === null
+                              ? "Not billable"
+                              : `$${selectedTooth.conditionPrice.toFixed(2)} / ${selectedToothPricing.label}`}
                           </p>
                         </div>
 
@@ -775,30 +766,16 @@ export default function EmrPage() {
                               value={selectedTooth.condition}
                               onChange={(event) => {
                                 const nextCondition = event.target.value as ToothCondition;
-                                const nextAllowedTreatments =
-                                  allowedTreatmentsForCondition(nextCondition);
-                                const canKeepCurrentTreatment = nextAllowedTreatments.some(
-                                  (item) => item.id === selectedTooth.billableTreatmentId,
-                                );
-
                                 handleToothChange(
                                   selectedTooth.toothNumber,
                                   "condition",
                                   nextCondition,
                                 );
-
-                                if (!canKeepCurrentTreatment) {
-                                  handleToothChange(
-                                    selectedTooth.toothNumber,
-                                    "billableTreatmentId",
-                                    "",
-                                  );
-                                  handleToothChange(
-                                    selectedTooth.toothNumber,
-                                    "billableUnitPrice",
-                                    "",
-                                  );
-                                }
+                                handleToothChange(
+                                  selectedTooth.toothNumber,
+                                  "conditionPrice",
+                                  String(toothConditionPricing[nextCondition].defaultPrice ?? ""),
+                                );
                               }}
                               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white"
                             >
@@ -832,69 +809,37 @@ export default function EmrPage() {
                         <div className="mt-4 grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
                           <label className="space-y-1">
                             <span className="text-sm font-medium text-slate-700">
-                              Billable Treatment
-                            </span>
-                            <select
-                              value={selectedTooth.billableTreatmentId}
-                              onChange={(event) =>
-                                {
-                                  const nextTreatmentId = event.target.value;
-                                  const catalogItem = treatmentCatalog.find(
-                                    (item) => item.id === nextTreatmentId,
-                                  );
-                                  handleToothChange(
-                                    selectedTooth.toothNumber,
-                                    "billableTreatmentId",
-                                    nextTreatmentId,
-                                  );
-                                  handleToothChange(
-                                    selectedTooth.toothNumber,
-                                    "billableUnitPrice",
-                                    nextTreatmentId
-                                      ? String(catalogItem?.defaultPrice ?? "")
-                                      : "",
-                                  );
-                                }
-                              }
-                              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white"
-                            >
-                              <option value="">Not billable</option>
-                              {allowedBillableTreatments.map((item) => (
-                                <option key={item.id} value={item.id}>
-                                  {item.name} - ${item.defaultPrice} / {item.pricingModel}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-
-                          <label className="space-y-1">
-                            <span className="text-sm font-medium text-slate-700">
-                              Tooth Price
+                              Condition Price
                             </span>
                             <input
                               type="number"
                               min="0"
                               step="0.01"
-                              value={selectedTooth.billableUnitPrice ?? ""}
+                              value={selectedTooth.conditionPrice ?? ""}
                               onChange={(event) =>
                                 handleToothChange(
                                   selectedTooth.toothNumber,
-                                  "billableUnitPrice",
+                                  "conditionPrice",
                                   event.target.value,
                                 )
                               }
                               placeholder={
-                                selectedTooth.billableTreatmentId
-                                  ? String(
-                                      treatmentCatalog.find(
-                                        (item) => item.id === selectedTooth.billableTreatmentId,
-                                      )?.defaultPrice ?? "",
-                                    )
-                                  : "No price"
+                                selectedToothPricing.defaultPrice === null
+                                  ? "No default price"
+                                  : String(selectedToothPricing.defaultPrice)
                               }
                               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white"
                             />
                           </label>
+
+                          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                            <p className="text-sm font-medium text-slate-700">Price Rule</p>
+                            <p className="mt-1 text-sm text-slate-600">
+                              {selectedToothPricing.defaultPrice === null
+                                ? `${selectedToothPricing.label} teeth are not billed by default.`
+                                : `${selectedToothPricing.label} uses a default price of $${selectedToothPricing.defaultPrice.toFixed(2)}.`}
+                            </p>
+                          </div>
                         </div>
 
                         <div className="mt-4 grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">

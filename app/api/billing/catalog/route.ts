@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { treatmentCatalog } from "@/lib/clinic-types";
+import { toothConditionOptions, toothConditionPricing } from "@/lib/clinic-types";
 
 export async function GET() {
-  return NextResponse.json(treatmentCatalog);
+  return NextResponse.json(toothConditionOptions.map((condition) => toothConditionPricing[condition]));
 }
