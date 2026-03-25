@@ -1,18 +1,13 @@
 import type { Metadata } from "next";
 
-import { HomeSupportLanding } from "@/components/home-support-landing";
+import { DashboardOverview } from "@/components/dashboard-overview";
 
 export const metadata: Metadata = {
-  title: "Customer Support",
+  title: "Dashboard Overview",
   description:
-    "Dental support landing page with a clinic-style hero and embedded support request form.",
-  openGraph: {
-    title: "DentalFlow Customer Support",
-    description:
-      "Send a support message to the clinic team about appointments, billing, and general questions.",
-  },
+    "Operational dashboard for appointments, revenue, patient growth, and clinic activity.",
 };
 
 export default function HomePage() {
-  return <HomeSupportLanding />;
+  return <DashboardOverview />;
 }

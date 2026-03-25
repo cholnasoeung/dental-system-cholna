@@ -1,218 +1,157 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { AdminShell } from "@/components/admin-shell";
-import type { Appointment, DentalRecord, Invoice, PatientProfile } from "@/lib/clinic-types";
+import { DonutChart, RankedBars, TrendChart } from "@/components/clinic-charts";
+import { useClinicOverviewData } from "@/components/use-clinic-overview-data";
+import {
+  buildClinicInsights,
+  formatCompactCurrency,
+  formatCurrency,
+  formatDateLabel,
+  formatPercent,
+  type InsightPeriod,
+} from "@/lib/clinic-insights";
 
-function currency(amount: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(amount);
-}
+const periodOptions: Array<{ value: InsightPeriod; label: string }> = [
+  { value: "7d", label: "7 Days" },
+  { value: "30d", label: "30 Days" },
+  { value: "90d", label: "90 Days" },
+];
 
-function formatDateLabel(date: string) {
-  if (!date) {
-    return "Not set";
-  }
+const reportViews = [
+  { value: "overview", label: "Operations" },
+  { value: "finance", label: "Finance" },
+  { value: "patients", label: "Patients" },
+] as const;
 
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(date));
-}
-
-function invoiceTotal(invoice: Invoice) {
-  return invoice.lineItems.reduce(
-    (sum, item) => sum + item.quantity * item.unitPrice,
-    0,
-  );
-}
-
-function invoicePaid(invoice: Invoice) {
-  return invoice.payments.reduce((sum, payment) => sum + payment.amount, 0);
-}
-
-function objectIdDate(id: string) {
-  if (!/^[a-fA-F0-9]{24}$/.test(id)) {
-    return null;
-  }
-
-  const timestampHex = id.slice(0, 8);
-  const timestamp = Number.parseInt(timestampHex, 16) * 1000;
-  return new Date(timestamp);
-}
+const reportColors = ["#0284c7", "#0f766e", "#7c3aed", "#f59e0b", "#ef4444", "#64748b"];
 
 export default function ReportsPage() {
-  const [patients, setPatients] = useState<PatientProfile[]>([]);
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [records, setRecords] = useState<DentalRecord[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState("");
+  const [period, setPeriod] = useState<InsightPeriod>("30d");
+  const [view, setView] = useState<(typeof reportViews)[number]["value"]>("overview");
+  const { patients, appointments, invoices, records, staffMembers, isLoading, errorMessage, reload } =
+    useClinicOverviewData();
 
-  useEffect(() => {
-    async function loadReportData() {
-      try {
-        setIsLoading(true);
-        setErrorMessage("");
+  const insights = useMemo(
+    () =>
+      buildClinicInsights({
+        patients,
+        appointments,
+        invoices,
+        records,
+        staffMembers,
+        period,
+      }),
+    [appointments, invoices, patients, period, records, staffMembers],
+  );
 
-        const [patientsResponse, appointmentsResponse, invoicesResponse, recordsResponse] =
-          await Promise.all([
-            fetch("/api/patients", { cache: "no-store" }),
-            fetch("/api/appointments", { cache: "no-store" }),
-            fetch("/api/billing", { cache: "no-store" }),
-            fetch("/api/emr", { cache: "no-store" }),
-          ]);
-
-        if (
-          !patientsResponse.ok ||
-          !appointmentsResponse.ok ||
-          !invoicesResponse.ok ||
-          !recordsResponse.ok
-        ) {
-          throw new Error(
-            `${patientsResponse.ok ? "" : await patientsResponse.text()} ${
-              appointmentsResponse.ok ? "" : await appointmentsResponse.text()
-            } ${invoicesResponse.ok ? "" : await invoicesResponse.text()} ${
-              recordsResponse.ok ? "" : await recordsResponse.text()
-            }`.trim(),
-          );
-        }
-
-        const [patientsData, appointmentsData, invoicesData, recordsData] =
-          await Promise.all([
-            (await patientsResponse.json()) as PatientProfile[],
-            (await appointmentsResponse.json()) as Appointment[],
-            (await invoicesResponse.json()) as Invoice[],
-            (await recordsResponse.json()) as DentalRecord[],
-          ]);
-
-        setPatients(patientsData);
-        setAppointments(appointmentsData);
-        setInvoices(invoicesData);
-        setRecords(recordsData);
-      } catch (error) {
-        console.error(error);
-        setErrorMessage(
-          error instanceof Error ? error.message : "Unable to load report data.",
-        );
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    loadReportData();
-  }, []);
-
-  const analytics = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-
-    const dailyAppointments = appointments.filter(
-      (appointment) => appointment.date === today,
-    );
-
-    const totalRevenue = invoices.reduce((sum, invoice) => sum + invoicePaid(invoice), 0);
-    const totalOutstanding = invoices.reduce(
-      (sum, invoice) => sum + Math.max(invoiceTotal(invoice) - invoicePaid(invoice), 0),
-      0,
-    );
-
-    const patientGrowthMap = patients.reduce<Record<string, number>>((acc, patient) => {
-      const createdAt = objectIdDate(patient.id);
-      if (!createdAt) {
-        return acc;
-      }
-      const key = `${createdAt.getFullYear()}-${String(createdAt.getMonth() + 1).padStart(2, "0")}`;
-      acc[key] = (acc[key] ?? 0) + 1;
-      return acc;
-    }, {});
-
-    const patientGrowth = Object.entries(patientGrowthMap)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .slice(-6);
-
-    const dentistWorkload = appointments.reduce<Record<string, number>>((acc, appointment) => {
-      acc[appointment.dentist] = (acc[appointment.dentist] ?? 0) + 1;
-      return acc;
-    }, {});
-
-    const treatmentFrequency = records.reduce<Record<string, number>>((acc, record) => {
-      const text = `${record.procedureHistory} ${record.treatmentPlan}`.toLowerCase();
-      const knownTreatments = [
-        "scaling",
-        "filling",
-        "crown",
-        "extraction",
-        "root canal",
-        "implant",
-        "cleaning",
-      ];
-
-      knownTreatments.forEach((treatment) => {
-        if (text.includes(treatment)) {
-          acc[treatment] = (acc[treatment] ?? 0) + 1;
-        }
-      });
-
-      return acc;
-    }, {});
-
-    return {
-      dailyAppointments,
-      totalRevenue,
-      totalOutstanding,
-      patientGrowth,
-      dentistWorkload: Object.entries(dentistWorkload).sort((a, b) => b[1] - a[1]),
-      treatmentFrequency: Object.entries(treatmentFrequency).sort((a, b) => b[1] - a[1]),
-    };
-  }, [appointments, invoices, patients, records]);
+  const labels = insights.timeSeries.map((point) => point.label);
 
   return (
     <AdminShell>
       <div className="w-full space-y-6">
-        <header className="rounded-[28px] border border-white/80 bg-white/80 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
+        <header className="rounded-[32px] border border-white/80 bg-white/90 p-6 shadow-[0_22px_60px_rgba(15,23,42,0.08)]">
           <p className="text-xs font-semibold uppercase tracking-[0.35em] text-sky-700">
             Module H
           </p>
-          <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <h2 className="text-3xl font-semibold tracking-tight text-slate-950">
+          <div className="mt-3 flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+            <div className="max-w-3xl">
+              <h1 className="text-3xl font-semibold tracking-tight text-slate-950">
                 Reports & Analytics
-              </h2>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                This is the final step in the flow chart, where saved visit, billing,
-                and appointment data become dashboard and reporting insights.
+              </h1>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Switch between operational, financial, and patient-focused views, then print or refresh without leaving the report workspace.
               </p>
             </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="rounded-2xl bg-slate-950 px-4 py-3 text-white">
-                <p className="text-xs uppercase tracking-[0.22em] text-cyan-200">
-                  Daily Visits
-                </p>
-                <p className="mt-2 text-2xl font-semibold">
-                  {analytics.dailyAppointments.length}
-                </p>
+
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-wrap gap-2">
+                {periodOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setPeriod(option.value)}
+                    className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                      period === option.value
+                        ? "bg-slate-950 text-white"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
               </div>
-              <div className="rounded-2xl bg-sky-50 px-4 py-3 ring-1 ring-sky-100">
-                <p className="text-xs uppercase tracking-[0.22em] text-slate-500">
-                  Revenue
-                </p>
-                <p className="mt-2 text-2xl font-semibold text-slate-900">
-                  {currency(analytics.totalRevenue)}
-                </p>
-              </div>
-              <div className="rounded-2xl bg-sky-50 px-4 py-3 ring-1 ring-sky-100">
-                <p className="text-xs uppercase tracking-[0.22em] text-slate-500">
-                  Outstanding
-                </p>
-                <p className="mt-2 text-2xl font-semibold text-slate-900">
-                  {currency(analytics.totalOutstanding)}
-                </p>
+              <div className="flex flex-wrap gap-2">
+                {reportViews.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setView(option.value)}
+                    className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                      view === option.value
+                        ? "bg-sky-700 text-white"
+                        : "bg-sky-50 text-sky-700 hover:bg-sky-100"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => void reload()}
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  Refresh
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  Print
+                </button>
               </div>
             </div>
+          </div>
+
+          <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            <article className="rounded-2xl bg-slate-950 px-4 py-4 text-white">
+              <p className="text-xs uppercase tracking-[0.22em] text-cyan-200">Appointments</p>
+              <p className="mt-2 text-2xl font-semibold">{insights.periodAppointments}</p>
+              <p className="mt-1 text-xs text-slate-300">selected period</p>
+            </article>
+            <article className="rounded-2xl bg-sky-50 px-4 py-4 ring-1 ring-sky-100">
+              <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Collected</p>
+              <p className="mt-2 text-2xl font-semibold text-slate-900">
+                {formatCompactCurrency(insights.collectedRevenue)}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">all-time receipts</p>
+            </article>
+            <article className="rounded-2xl bg-sky-50 px-4 py-4 ring-1 ring-sky-100">
+              <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Outstanding</p>
+              <p className="mt-2 text-2xl font-semibold text-slate-900">
+                {formatCompactCurrency(insights.outstandingRevenue)}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                {insights.outstandingInvoiceCount} invoice{insights.outstandingInvoiceCount === 1 ? "" : "s"}
+              </p>
+            </article>
+            <article className="rounded-2xl bg-sky-50 px-4 py-4 ring-1 ring-sky-100">
+              <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Completion</p>
+              <p className="mt-2 text-2xl font-semibold text-slate-900">
+                {formatPercent(insights.completionRate)}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                {formatPercent(insights.noShowRate)} no-show rate
+              </p>
+            </article>
+            <article className="rounded-2xl bg-sky-50 px-4 py-4 ring-1 ring-sky-100">
+              <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Patients</p>
+              <p className="mt-2 text-2xl font-semibold text-slate-900">{insights.activePatients}</p>
+              <p className="mt-1 text-xs text-slate-500">active patient profiles</p>
+            </article>
           </div>
         </header>
 
@@ -228,139 +167,370 @@ export default function ReportsPage() {
           </div>
         ) : null}
 
-        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-          <section className="rounded-[28px] border border-white/80 bg-white/85 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)] xl:col-span-2">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xl font-semibold text-slate-950">Daily Appointments</h3>
-              <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700">
-                {formatDateLabel(new Date().toISOString().slice(0, 10))}
-              </span>
+        <section className="rounded-[30px] border border-white/80 bg-[linear-gradient(135deg,#0f172a_0%,#102b46_52%,#164e63_100%)] p-6 text-white shadow-[0_20px_50px_rgba(15,23,42,0.16)]">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.28em] text-cyan-200/80">
+                Reporting Window
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight">
+                {formatDateLabel(insights.startDate)} to {formatDateLabel(insights.endDate)}
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-slate-300">
+                Use the segmented report views above to focus on workflow, revenue, or patient growth without changing pages.
+              </p>
             </div>
-            <div className="mt-4 space-y-3">
-              {analytics.dailyAppointments.length === 0 ? (
-                <p className="rounded-2xl bg-slate-100 p-4 text-sm text-slate-600">
-                  No appointments scheduled for today.
-                </p>
-              ) : (
-                analytics.dailyAppointments.map((appointment) => (
-                  <article
-                    key={appointment.id}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="font-semibold text-slate-900">
-                          {appointment.patientName}
-                        </p>
-                        <p className="mt-1 text-sm text-slate-500">
-                          {appointment.time} | {appointment.dentist}
-                        </p>
-                      </div>
-                      <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
-                        {appointment.status}
-                      </span>
-                    </div>
-                  </article>
-                ))
-              )}
-            </div>
-          </section>
-
-          <section className="rounded-[28px] border border-white/80 bg-slate-950 p-6 text-white shadow-[0_20px_50px_rgba(15,23,42,0.16)]">
-            <p className="text-xs uppercase tracking-[0.28em] text-cyan-200/75">
-              Revenue Snapshot
-            </p>
-            <div className="mt-4 space-y-4">
-              <div className="rounded-2xl bg-white/8 p-4">
-                <p className="text-sm text-slate-300">Collected Revenue</p>
-                <p className="mt-1 text-3xl font-semibold text-white">
-                  {currency(analytics.totalRevenue)}
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl bg-white/10 px-4 py-3 ring-1 ring-white/10">
+                <p className="text-xs uppercase tracking-[0.2em] text-cyan-200">Checked In</p>
+                <p className="mt-2 text-2xl font-semibold">{formatPercent(insights.checkedInRate)}</p>
+              </div>
+              <div className="rounded-2xl bg-white/10 px-4 py-3 ring-1 ring-white/10">
+                <p className="text-xs uppercase tracking-[0.2em] text-cyan-200">Avg / Visit</p>
+                <p className="mt-2 text-2xl font-semibold">
+                  {formatCurrency(insights.avgCollectedPerVisit)}
                 </p>
               </div>
-              <div className="rounded-2xl bg-white/8 p-4">
-                <p className="text-sm text-slate-300">Outstanding Balance</p>
-                <p className="mt-1 text-3xl font-semibold text-white">
-                  {currency(analytics.totalOutstanding)}
+              <div className="rounded-2xl bg-white/10 px-4 py-3 ring-1 ring-white/10">
+                <p className="text-xs uppercase tracking-[0.2em] text-cyan-200">Dentists Ready</p>
+                <p className="mt-2 text-2xl font-semibold">
+                  {insights.availableDentists}/{insights.totalDentists || 0}
                 </p>
               </div>
             </div>
-          </section>
+          </div>
+        </section>
 
-          <section className="rounded-[28px] border border-white/80 bg-white/85 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
-            <h3 className="text-xl font-semibold text-slate-950">Patient Growth</h3>
-            <div className="mt-4 space-y-3">
-              {analytics.patientGrowth.length === 0 ? (
-                <p className="rounded-2xl bg-slate-100 p-4 text-sm text-slate-600">
-                  No patient growth data yet.
+        {view === "overview" ? (
+          <div className="space-y-6">
+            <div className="grid gap-6 xl:grid-cols-[1.4fr_0.95fr]">
+              <section className="rounded-[30px] border border-white/80 bg-white/90 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-sky-700">
+                  Activity Trend
                 </p>
-              ) : (
-                analytics.patientGrowth.map(([month, count]) => (
-                  <div
-                    key={month}
-                    className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3 ring-1 ring-slate-100"
-                  >
-                    <p className="font-medium text-slate-900">{month}</p>
-                    <span className="rounded-full bg-slate-950 px-3 py-1 text-sm text-white">
-                      {count}
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                  Scheduled versus completed visits
+                </h2>
+                <div className="mt-5">
+                  <TrendChart
+                    labels={labels}
+                    series={[
+                      {
+                        label: "Scheduled",
+                        values: insights.timeSeries.map((point) => point.appointments),
+                        color: "#0284c7",
+                        fillColor: "rgba(2,132,199,0.10)",
+                      },
+                      {
+                        label: "Completed",
+                        values: insights.timeSeries.map((point) => point.completed),
+                        color: "#0f766e",
+                        fillColor: "rgba(15,118,110,0.08)",
+                      },
+                    ]}
+                  />
+                </div>
+              </section>
 
-          <section className="rounded-[28px] border border-white/80 bg-white/85 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
-            <h3 className="text-xl font-semibold text-slate-950">Dentist Workload</h3>
-            <div className="mt-4 space-y-3">
-              {analytics.dentistWorkload.length === 0 ? (
-                <p className="rounded-2xl bg-slate-100 p-4 text-sm text-slate-600">
-                  No dentist workload data yet.
+              <section className="rounded-[30px] border border-white/80 bg-white/90 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-sky-700">
+                  Status Mix
                 </p>
-              ) : (
-                analytics.dentistWorkload.map(([dentist, count]) => (
-                  <div
-                    key={dentist}
-                    className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3 ring-1 ring-slate-100"
-                  >
-                    <p className="font-medium text-slate-900">{dentist}</p>
-                    <span className="rounded-full bg-sky-700 px-3 py-1 text-sm text-white">
-                      {count}
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
-
-          <section className="rounded-[28px] border border-white/80 bg-white/85 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)] xl:col-span-3">
-            <h3 className="text-xl font-semibold text-slate-950">
-              Treatment Frequency Reports
-            </h3>
-            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              {analytics.treatmentFrequency.length === 0 ? (
-                <p className="rounded-2xl bg-slate-100 p-4 text-sm text-slate-600 md:col-span-2 xl:col-span-4">
-                  No treatment frequency data yet.
-                </p>
-              ) : (
-                analytics.treatmentFrequency.map(([treatment, count]) => (
-                  <div
-                    key={treatment}
-                    className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-100"
-                  >
-                    <p className="text-sm uppercase tracking-[0.2em] text-slate-500">
-                      {treatment}
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                  Appointment outcomes
+                </h2>
+                <div className="mt-5">
+                  {insights.statusBreakdown.length === 0 ? (
+                    <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600 ring-1 ring-slate-200">
+                      No appointment activity was found for this report window.
                     </p>
+                  ) : (
+                    <DonutChart
+                      items={insights.statusBreakdown.map((item, index) => ({
+                        ...item,
+                        color: reportColors[index % reportColors.length],
+                      }))}
+                      centerLabel="Completion"
+                      centerValue={formatPercent(insights.completionRate)}
+                    />
+                  )}
+                </div>
+              </section>
+            </div>
+
+            <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+              <section className="rounded-[30px] border border-white/80 bg-white/90 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-sky-700">
+                  Dentist Load
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                  Team throughput for this period
+                </h2>
+                <div className="mt-5">
+                  {insights.dentistLoad.length === 0 ? (
+                    <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600 ring-1 ring-slate-200">
+                      Once appointments are assigned, dentist activity will be ranked here.
+                    </p>
+                  ) : (
+                    <RankedBars
+                      items={insights.dentistLoad.map((item) => ({
+                        label: item.label,
+                        value: item.appointments,
+                        detail: `${item.completed} completed | ${item.minutes} minutes`,
+                      }))}
+                      color="#0284c7"
+                    />
+                  )}
+                </div>
+              </section>
+
+              <section className="rounded-[30px] border border-white/80 bg-white/90 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-sky-700">
+                  Treatment Mix
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                  Most common procedures
+                </h2>
+                <div className="mt-5">
+                  {insights.treatmentMix.length === 0 ? (
+                    <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600 ring-1 ring-slate-200">
+                      Treatment analytics will appear once appointment procedures or EMR notes exist.
+                    </p>
+                  ) : (
+                    <RankedBars items={insights.treatmentMix} color="#7c3aed" />
+                  )}
+                </div>
+              </section>
+            </div>
+          </div>
+        ) : null}
+
+        {view === "finance" ? (
+          <div className="space-y-6">
+            <div className="grid gap-6 xl:grid-cols-[1.35fr_0.95fr]">
+              <section className="rounded-[30px] border border-white/80 bg-white/90 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-sky-700">
+                  Revenue Trend
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                  Recorded collections by day
+                </h2>
+                <div className="mt-5">
+                  <TrendChart
+                    labels={labels}
+                    series={[
+                      {
+                        label: "Collections",
+                        values: insights.timeSeries.map((point) => point.revenue),
+                        color: "#f97316",
+                        fillColor: "rgba(249,115,22,0.12)",
+                        formatValue: formatCompactCurrency,
+                      },
+                    ]}
+                  />
+                </div>
+              </section>
+
+              <section className="rounded-[30px] border border-white/80 bg-white/90 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-sky-700">
+                  Payment Methods
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                  Collection channel mix
+                </h2>
+                <div className="mt-5">
+                  {insights.paymentMix.length === 0 ? (
+                    <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600 ring-1 ring-slate-200">
+                      Payment method analysis appears after recorded payments are saved.
+                    </p>
+                  ) : (
+                    <DonutChart
+                      items={insights.paymentMix.map((item, index) => ({
+                        ...item,
+                        color: reportColors[index % reportColors.length],
+                      }))}
+                      centerLabel="Collection"
+                      centerValue={formatPercent(insights.collectionRate)}
+                    />
+                  )}
+                </div>
+              </section>
+            </div>
+
+            <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
+              <section className="rounded-[30px] border border-white/80 bg-white/90 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-sky-700">
+                  Outstanding Invoices
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                  Balances that still need collection
+                </h2>
+                <div className="mt-5 space-y-3">
+                  {insights.outstandingInvoices.length === 0 ? (
+                    <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600 ring-1 ring-slate-200">
+                      No outstanding invoices were detected.
+                    </p>
+                  ) : (
+                    insights.outstandingInvoices.map((item) => (
+                      <article
+                        key={item.invoice.id}
+                        className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-semibold text-slate-900">
+                              {item.invoice.invoiceNumber}
+                            </p>
+                            <p className="mt-1 text-sm text-slate-500">
+                              {item.invoice.patientName} | {formatDateLabel(item.invoice.issueDate)}
+                            </p>
+                          </div>
+                          <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-rose-700 ring-1 ring-rose-100">
+                            {formatCurrency(item.outstanding)}
+                          </span>
+                        </div>
+                        <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
+                          <div className="rounded-2xl bg-white p-3 ring-1 ring-slate-200">
+                            <p className="text-slate-500">Total</p>
+                            <p className="mt-1 font-semibold text-slate-900">
+                              {formatCurrency(item.total)}
+                            </p>
+                          </div>
+                          <div className="rounded-2xl bg-white p-3 ring-1 ring-slate-200">
+                            <p className="text-slate-500">Paid</p>
+                            <p className="mt-1 font-semibold text-emerald-700">
+                              {formatCurrency(item.paid)}
+                            </p>
+                          </div>
+                          <div className="rounded-2xl bg-white p-3 ring-1 ring-slate-200">
+                            <p className="text-slate-500">Balance</p>
+                            <p className="mt-1 font-semibold text-rose-700">
+                              {formatCurrency(item.outstanding)}
+                            </p>
+                          </div>
+                        </div>
+                      </article>
+                    ))
+                  )}
+                </div>
+              </section>
+
+              <section className="rounded-[30px] border border-white/80 bg-white/90 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-sky-700">
+                  Balance Ranking
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                  Highest unpaid amounts
+                </h2>
+                <div className="mt-5">
+                  {insights.outstandingInvoices.length === 0 ? (
+                    <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600 ring-1 ring-slate-200">
+                      There are no unpaid balances to rank right now.
+                    </p>
+                  ) : (
+                    <RankedBars
+                      items={insights.outstandingInvoices.map((item) => ({
+                        label: item.invoice.patientName,
+                        value: item.outstanding,
+                        detail: item.invoice.invoiceNumber,
+                      }))}
+                      color="#ef4444"
+                      formatValue={formatCurrency}
+                    />
+                  )}
+                </div>
+              </section>
+            </div>
+          </div>
+        ) : null}
+
+        {view === "patients" ? (
+          <div className="space-y-6">
+            <div className="grid gap-6 xl:grid-cols-[1.35fr_0.95fr]">
+              <section className="rounded-[30px] border border-white/80 bg-white/90 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-sky-700">
+                  New Registrations
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                  Intake trend for the selected period
+                </h2>
+                <div className="mt-5">
+                  <TrendChart
+                    labels={labels}
+                    series={[
+                      {
+                        label: "New Patients",
+                        values: insights.timeSeries.map((point) => point.newPatients),
+                        color: "#7c3aed",
+                        fillColor: "rgba(124,58,237,0.12)",
+                      },
+                    ]}
+                  />
+                </div>
+              </section>
+
+              <section className="rounded-[30px] border border-white/80 bg-white/90 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-sky-700">
+                  Patient Profile Mix
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                  Active and VIP coverage
+                </h2>
+                <div className="mt-5 grid gap-3">
+                  <div className="rounded-2xl bg-slate-950 p-5 text-white">
+                    <p className="text-sm text-slate-300">Total patient profiles</p>
+                    <p className="mt-2 text-3xl font-semibold">{insights.totalPatients}</p>
+                  </div>
+                  <div className="rounded-2xl bg-sky-50 p-5 ring-1 ring-sky-100">
+                    <p className="text-sm text-slate-500">Active patients</p>
                     <p className="mt-2 text-3xl font-semibold text-slate-950">
-                      {count}
+                      {insights.activePatients}
                     </p>
                   </div>
-                ))
-              )}
+                  <div className="rounded-2xl bg-amber-50 p-5 ring-1 ring-amber-100">
+                    <p className="text-sm text-amber-700">VIP patients</p>
+                    <p className="mt-2 text-3xl font-semibold text-slate-950">
+                      {insights.vipPatients}
+                    </p>
+                  </div>
+                </div>
+              </section>
             </div>
-          </section>
-        </div>
+
+            <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
+              <section className="rounded-[30px] border border-white/80 bg-white/90 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-sky-700">
+                  Monthly Growth
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                  Last six months of registrations
+                </h2>
+                <div className="mt-5">
+                  <RankedBars items={insights.patientGrowth} color="#0f766e" />
+                </div>
+              </section>
+
+              <section className="rounded-[30px] border border-white/80 bg-white/90 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-sky-700">
+                  Care Demand
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                  Which treatments patients need most
+                </h2>
+                <div className="mt-5">
+                  {insights.treatmentMix.length === 0 ? (
+                    <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600 ring-1 ring-slate-200">
+                      Patient demand insights will populate after clinical activity is saved.
+                    </p>
+                  ) : (
+                    <RankedBars items={insights.treatmentMix} color="#7c3aed" />
+                  )}
+                </div>
+              </section>
+            </div>
+          </div>
+        ) : null}
       </div>
     </AdminShell>
   );
 }
-

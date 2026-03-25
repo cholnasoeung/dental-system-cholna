@@ -9,9 +9,7 @@ function LoginPageContent() {
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl");
   const redirectUrl =
-    callbackUrl && callbackUrl.startsWith("/") && callbackUrl !== "/"
-      ? callbackUrl
-      : "/reports";
+    callbackUrl && callbackUrl.startsWith("/") ? callbackUrl : "/";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
