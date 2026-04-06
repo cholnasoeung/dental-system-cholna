@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import React, { ChangeEvent, useEffect, useMemo, useState } from "react";
 
 import { AdminShell } from "@/components/admin-shell";
 import {
@@ -18,44 +18,47 @@ import {
   type UploadedFile,
 } from "@/lib/clinic-types";
 
+// ─── Shared styles ─────────────────────────────────────────────────
+const input = "w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-2 focus:ring-sky-100";
+const label = "mb-1.5 block text-[11px] font-semibold uppercase tracking-widest text-slate-500";
+
 function mapFiles(files: FileList | null, category: NonNullable<UploadedFile["category"]>) {
   if (!files) return [];
-  return Array.from(files).map((file) => ({
-    name: file.name,
-    size: file.size,
-    type: file.type,
-    category,
-  }));
+  return Array.from(files).map((f) => ({ name: f.name, size: f.size, type: f.type, category }));
 }
-
 function parseLines(value: string) {
-  return value
-    .split(/\r?\n|,/)
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .filter((item, index, list) => list.indexOf(item) === index);
+  return value.split(/\r?\n|,/).map((s) => s.trim()).filter(Boolean).filter((s, i, a) => a.indexOf(s) === i);
 }
-
-function formatDateLabel(value: string) {
-  if (!value) return "Not set";
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value));
+function fmtDate(v: string) {
+  if (!v) return "Not set";
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(v));
 }
-
-function currency(amount: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(amount);
+function usd(n: number) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
 }
-
-function calculatePatientAge(dateOfBirth: string) {
-  if (!dateOfBirth) return null;
-  const birth = new Date(dateOfBirth);
-  if (Number.isNaN(birth.getTime())) return null;
-  const today = new Date();
-  let age = today.getFullYear() - birth.getFullYear();
-  const monthDifference = today.getMonth() - birth.getMonth();
-  if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < birth.getDate())) {
-    age -= 1;
-  }
+function calcAge(dob: string) {
+  if (!dob) return null;
+  const b = new Date(dob);
+  if (isNaN(b.getTime())) return null;
+  const t = new Date();
+  let age = t.getFullYear() - b.getFullYear();
+  if (t.getMonth() < b.getMonth() || (t.getMonth() === b.getMonth() && t.getDate() < b.getDate())) age--;
   return age;
+}
+function initials(name: string) {
+  return name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase();
+}
+
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return <label className={label}>{children}</label>;
+}
+function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4">
+      <p className="mb-3 text-[11px] font-bold uppercase tracking-widest text-slate-500">{title}</p>
+      <div className="space-y-3">{children}</div>
+    </div>
+  );
 }
 
 export default function PatientsPage() {
@@ -72,40 +75,35 @@ export default function PatientsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [showForm, setShowForm] = useState(false);
 
   useEffect(() => {
-    async function loadPatients() {
+    async function load() {
       try {
         setIsLoading(true);
-        const response = await fetch("/api/patients", { cache: "no-store" });
-        if (!response.ok) throw new Error(await response.text());
-        setPatients((await response.json()) as PatientProfile[]);
-      } catch (error) {
-        console.error(error);
-        setErrorMessage(error instanceof Error ? error.message : "Unable to load patients.");
+        const res = await fetch("/api/patients", { cache: "no-store" });
+        if (!res.ok) throw new Error(await res.text());
+        setPatients((await res.json()) as PatientProfile[]);
+      } catch (e) {
+        setErrorMessage(e instanceof Error ? e.message : "Unable to load patients.");
       } finally {
         setIsLoading(false);
       }
     }
-
-    void loadPatients();
+    void load();
   }, []);
 
   function resetForm() {
     setPatientForm(initialPatientForm);
-    setDocuments([]);
-    setXrays([]);
-    setInsuranceCards([]);
-    setConsentForms([]);
+    setDocuments([]); setXrays([]); setInsuranceCards([]); setConsentForms([]);
     setEditingPatientId("");
+    setShowForm(false);
   }
 
-  function handleFieldChange(
-    event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
-  ) {
-    const { name, value } = event.target;
-    setPatientForm((current) => {
-      const next = { ...current, [name]: value };
+  function handleFieldChange(e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
+    const { name, value } = e.target;
+    setPatientForm((cur) => {
+      const next = { ...cur, [name]: value };
       if (name === "province" || name === "city" || name === "address") {
         next.fullAddress = [next.address, next.city, next.province].filter(Boolean).join(", ");
       }
@@ -115,302 +113,497 @@ export default function PatientsPage() {
 
   function updateNested(
     section: "oralHealthHistory" | "medicalConditions" | "allergyProfile" | "communicationPreferences" | "settings" | "alertFlags",
-    field: string,
-    value: string | boolean,
+    field: string, value: string | boolean,
   ) {
-    setPatientForm((current) => ({
-      ...current,
-      [section]: { ...current[section], [field]: value },
-    }));
+    setPatientForm((cur) => ({ ...cur, [section]: { ...cur[section], [field]: value } }));
   }
 
-  function handleFiles(event: ChangeEvent<HTMLInputElement>, type: "documents" | "xrays" | "insuranceCards" | "consentForms") {
-    const files =
-      type === "documents"
-        ? mapFiles(event.target.files, "document")
-        : type === "xrays"
-          ? mapFiles(event.target.files, "xray")
-          : type === "insuranceCards"
-            ? mapFiles(event.target.files, "insurance-card")
-            : mapFiles(event.target.files, "consent-form");
+  function handleFiles(e: ChangeEvent<HTMLInputElement>, type: "documents" | "xrays" | "insuranceCards" | "consentForms") {
+    const cat = type === "documents" ? "document" : type === "xrays" ? "xray" : type === "insuranceCards" ? "insurance-card" : "consent-form";
+    const files = mapFiles(e.target.files, cat as NonNullable<UploadedFile["category"]>);
     if (type === "documents") setDocuments(files);
-    if (type === "xrays") setXrays(files);
-    if (type === "insuranceCards") setInsuranceCards(files);
-    if (type === "consentForms") setConsentForms(files);
+    else if (type === "xrays") setXrays(files);
+    else if (type === "insuranceCards") setInsuranceCards(files);
+    else setConsentForms(files);
   }
 
-  function handleEditPatient(patient: PatientProfile) {
+  function handleEdit(patient: PatientProfile) {
     setPatientForm({
-      nationalId: patient.nationalId,
-      passportNumber: patient.passportNumber,
-      fullName: patient.fullName,
-      dateOfBirth: patient.dateOfBirth,
-      gender: patient.gender,
-      phone: patient.phone,
-      phoneNumbers: patient.phoneNumbers,
-      phoneNumbersText: patient.phoneNumbers.join("\n"),
-      email: patient.email,
-      province: patient.province,
-      city: patient.city,
-      address: patient.address,
-      fullAddress: patient.fullAddress,
-      profilePhoto: patient.profilePhoto,
-      status: patient.status,
-      registrationDate: patient.registrationDate,
-      patientType: patient.patientType,
-      occupation: patient.occupation,
-      emergencyContactName: patient.emergencyContactName,
-      emergencyContactRelation: patient.emergencyContactRelation,
-      emergencyContactPhone: patient.emergencyContactPhone,
-      secondaryContactName: patient.secondaryContactName,
-      secondaryContactRelation: patient.secondaryContactRelation,
-      secondaryContactPhone: patient.secondaryContactPhone,
-      familyMemberIds: patient.familyMemberIds,
-      familyMemberIdsText: patient.familyMemberIds.join("\n"),
-      medicalHistory: patient.medicalHistory,
-      oralHealthHistory: patient.oralHealthHistory,
-      medicalConditions: patient.medicalConditions,
-      allergies: patient.allergies,
-      allergyProfile: patient.allergyProfile,
-      riskLevel: patient.riskLevel,
-      insuranceProvider: patient.insuranceProvider,
-      policyNumber: patient.policyNumber,
-      coverageLimit: patient.coverageLimit,
-      insuranceExpiry: patient.insuranceExpiry,
-      billingPreference: patient.billingPreference,
-      creditBalance: patient.creditBalance,
-      communicationPreferences: patient.communicationPreferences,
-      settings: patient.settings,
+      nationalId: patient.nationalId, passportNumber: patient.passportNumber,
+      fullName: patient.fullName, dateOfBirth: patient.dateOfBirth, gender: patient.gender,
+      phone: patient.phone, phoneNumbers: patient.phoneNumbers,
+      phoneNumbersText: patient.phoneNumbers.join("\n"), email: patient.email,
+      province: patient.province, city: patient.city, address: patient.address,
+      fullAddress: patient.fullAddress, profilePhoto: patient.profilePhoto,
+      status: patient.status, registrationDate: patient.registrationDate,
+      patientType: patient.patientType, occupation: patient.occupation,
+      emergencyContactName: patient.emergencyContactName, emergencyContactRelation: patient.emergencyContactRelation,
+      emergencyContactPhone: patient.emergencyContactPhone, secondaryContactName: patient.secondaryContactName,
+      secondaryContactRelation: patient.secondaryContactRelation, secondaryContactPhone: patient.secondaryContactPhone,
+      familyMemberIds: patient.familyMemberIds, familyMemberIdsText: patient.familyMemberIds.join("\n"),
+      medicalHistory: patient.medicalHistory, oralHealthHistory: patient.oralHealthHistory,
+      medicalConditions: patient.medicalConditions, allergies: patient.allergies,
+      allergyProfile: patient.allergyProfile, riskLevel: patient.riskLevel,
+      insuranceProvider: patient.insuranceProvider, policyNumber: patient.policyNumber,
+      coverageLimit: patient.coverageLimit, insuranceExpiry: patient.insuranceExpiry,
+      billingPreference: patient.billingPreference, creditBalance: patient.creditBalance,
+      communicationPreferences: patient.communicationPreferences, settings: patient.settings,
       alertFlags: patient.alertFlags,
     });
-    setDocuments(patient.documents);
-    setXrays(patient.xrays);
-    setInsuranceCards(patient.insuranceCards);
-    setConsentForms(patient.consentForms);
+    setDocuments(patient.documents); setXrays(patient.xrays);
+    setInsuranceCards(patient.insuranceCards); setConsentForms(patient.consentForms);
     setEditingPatientId(patient.id);
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function handleSubmit(e: { preventDefault(): void }) {
+    e.preventDefault();
     try {
-      setIsSaving(true);
-      setErrorMessage("");
+      setIsSaving(true); setErrorMessage("");
       const payload = {
         ...patientForm,
         phoneNumbers: patientForm.phoneNumbersText ? parseLines(patientForm.phoneNumbersText) : [patientForm.phone],
         familyMemberIds: parseLines(patientForm.familyMemberIdsText),
-        documents,
-        xrays,
-        insuranceCards,
-        consentForms,
+        documents, xrays, insuranceCards, consentForms,
       };
-      const response = await fetch(editingPatientId ? `/api/patients/${editingPatientId}` : "/api/patients", {
+      const res = await fetch(editingPatientId ? `/api/patients/${editingPatientId}` : "/api/patients", {
         method: editingPatientId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!response.ok) throw new Error(await response.text());
-      const savedPatient = (await response.json()) as PatientProfile;
-      setPatients((current) => editingPatientId ? current.map((patient) => patient.id === editingPatientId ? savedPatient : patient) : [savedPatient, ...current]);
+      if (!res.ok) throw new Error(await res.text());
+      const saved = (await res.json()) as PatientProfile;
+      setPatients((cur) => editingPatientId ? cur.map((p) => p.id === editingPatientId ? saved : p) : [saved, ...cur]);
       resetForm();
-    } catch (error) {
-      console.error(error);
-      setErrorMessage(error instanceof Error ? error.message : "Unable to save patient.");
+    } catch (e) {
+      setErrorMessage(e instanceof Error ? e.message : "Unable to save patient.");
     } finally {
       setIsSaving(false);
     }
   }
 
-  async function handleDeletePatient(patientId: string) {
-    if (!window.confirm("Delete this patient record?")) return;
+  async function handleDelete(patientId: string) {
+    if (!window.confirm("Delete this patient record? This cannot be undone.")) return;
     try {
       setDeletingPatientId(patientId);
-      const response = await fetch(`/api/patients/${patientId}`, { method: "DELETE" });
-      if (!response.ok) throw new Error(await response.text());
-      setPatients((current) => current.filter((patient) => patient.id !== patientId));
+      const res = await fetch(`/api/patients/${patientId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(await res.text());
+      setPatients((cur) => cur.filter((p) => p.id !== patientId));
       if (editingPatientId === patientId) resetForm();
-    } catch (error) {
-      console.error(error);
-      setErrorMessage(error instanceof Error ? error.message : "Unable to delete patient.");
+    } catch (e) {
+      setErrorMessage(e instanceof Error ? e.message : "Unable to delete patient.");
     } finally {
       setDeletingPatientId("");
     }
   }
 
-  async function handleMergePatient(sourcePatientId: string, targetPatientId: string) {
-    if (!window.confirm("Merge this patient into the selected duplicate candidate?")) return;
+  async function handleMerge(sourceId: string, targetId: string) {
+    if (!window.confirm("Merge this patient into the candidate? The source record will be removed.")) return;
     try {
-      setMergingPatientId(sourcePatientId);
-      const response = await fetch("/api/patients/merge", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sourcePatientId, targetPatientId }),
+      setMergingPatientId(sourceId);
+      const res = await fetch("/api/patients/merge", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sourcePatientId: sourceId, targetPatientId: targetId }),
       });
-      if (!response.ok) throw new Error(await response.text());
+      if (!res.ok) throw new Error(await res.text());
       const refreshed = await fetch("/api/patients", { cache: "no-store" });
       if (!refreshed.ok) throw new Error(await refreshed.text());
       setPatients((await refreshed.json()) as PatientProfile[]);
-    } catch (error) {
-      console.error(error);
-      setErrorMessage(error instanceof Error ? error.message : "Unable to merge patient.");
+    } catch (e) {
+      setErrorMessage(e instanceof Error ? e.message : "Unable to merge patient.");
     } finally {
       setMergingPatientId("");
     }
   }
 
   const filteredPatients = useMemo(() => {
-    const query = searchTerm.trim().toLowerCase();
-    if (!query) return patients;
-    return patients.filter((patient) =>
-      [patient.patientId, patient.nationalId, patient.passportNumber, patient.fullName, patient.phone, ...patient.phoneNumbers, patient.email]
-        .join(" ")
-        .toLowerCase()
-        .includes(query),
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return patients;
+    return patients.filter((p) =>
+      [p.patientId, p.nationalId, p.passportNumber, p.fullName, p.phone, ...p.phoneNumbers, p.email]
+        .join(" ").toLowerCase().includes(q),
     );
   }, [patients, searchTerm]);
 
+  const activeCount = patients.filter((p) => p.status === "active").length;
+  const vipCount = patients.filter((p) => p.alertFlags.vip).length;
+  const dupCount = patients.filter((p) => (p.duplicateCandidates?.length ?? 0) > 0).length;
+
   return (
     <AdminShell>
-      <div className="w-full space-y-6">
-        <header className="rounded-[28px] border border-white/80 bg-white/80 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.35em] text-sky-700">Module A</p>
-          <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <h2 className="text-3xl font-semibold tracking-tight text-slate-950">Patient Management</h2>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Search quickly by patient ID, phone, or identity document, then manage lifecycle, risk, insurance, contacts, communication, files, and duplicates from one intake workspace.</p>
-            </div>
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-              <div className="rounded-2xl bg-slate-950 px-4 py-3 text-white"><p className="text-xs uppercase tracking-[0.22em] text-cyan-200">Patients</p><p className="mt-2 text-2xl font-semibold">{patients.length}</p></div>
-              <div className="rounded-2xl bg-sky-50 px-4 py-3 ring-1 ring-sky-100"><p className="text-xs uppercase tracking-[0.22em] text-slate-500">Active</p><p className="mt-2 text-2xl font-semibold text-slate-900">{patients.filter((patient) => patient.status === "active").length}</p></div>
-              <div className="rounded-2xl bg-sky-50 px-4 py-3 ring-1 ring-sky-100"><p className="text-xs uppercase tracking-[0.22em] text-slate-500">VIP</p><p className="mt-2 text-2xl font-semibold text-slate-900">{patients.filter((patient) => patient.alertFlags.vip).length}</p></div>
-              <div className="rounded-2xl bg-sky-50 px-4 py-3 ring-1 ring-sky-100"><p className="text-xs uppercase tracking-[0.22em] text-slate-500">Duplicates</p><p className="mt-2 text-2xl font-semibold text-slate-900">{patients.filter((patient) => (patient.duplicateCandidates?.length ?? 0) > 0).length}</p></div>
-            </div>
+      <div className="mx-auto max-w-[1400px] space-y-6">
+
+        {/* ── Page Header ──────────────────────────────────────────── */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-sky-600">Module A</p>
+            <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-slate-900">Patient Management</h1>
+            <p className="mt-1 text-sm text-slate-500">Search, create, and manage patient profiles, history, and insurance.</p>
           </div>
-        </header>
+          <button
+            type="button"
+            onClick={() => { setShowForm((v) => !v); if (editingPatientId) resetForm(); }}
+            className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
+          >
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-3.5 w-3.5">
+              <path d="M8 2v12M2 8h12"/>
+            </svg>
+            {showForm ? "Hide Form" : "New Patient"}
+          </button>
+        </div>
 
-        {isLoading ? <div className="rounded-[24px] border border-sky-100 bg-sky-50 px-5 py-4 text-sm text-sky-800">Loading patient data from MongoDB...</div> : null}
-        {errorMessage ? <div className="rounded-[24px] border border-rose-100 bg-rose-50 px-5 py-4 text-sm text-rose-700">{errorMessage}</div> : null}
-
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_420px]">
-          <section className="rounded-[28px] border border-white/80 bg-white/85 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-xl font-semibold text-slate-950">{editingPatientId ? "Edit Patient Profile" : "Create Patient Profile"}</h3>
-                <p className="mt-1 text-sm text-slate-500">Core intake plus medical, insurance, communication, and alert settings.</p>
-              </div>
-              {editingPatientId ? <button type="button" onClick={resetForm} className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">Cancel Edit</button> : null}
+        {/* KPI row */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[
+            { label: "Total", value: patients.length, color: "bg-slate-900 text-white", sub: "text-slate-400" },
+            { label: "Active", value: activeCount, color: "bg-white", sub: "text-slate-400" },
+            { label: "VIP", value: vipCount, color: "bg-white", sub: "text-slate-400" },
+            { label: "Duplicates", value: dupCount, color: dupCount > 0 ? "bg-amber-50" : "bg-white", sub: "text-slate-400" },
+          ].map((stat) => (
+            <div key={stat.label} className={`rounded-2xl border border-slate-200 px-4 py-3 shadow-sm ${stat.color}`}>
+              <p className={`text-[10px] font-semibold uppercase tracking-widest ${stat.color.includes("slate-900") ? "text-slate-400" : "text-slate-400"}`}>{stat.label}</p>
+              <p className={`mt-1.5 text-2xl font-bold ${stat.color.includes("slate-900") ? "text-white" : "text-slate-900"}`}>{stat.value}</p>
             </div>
-            <form className="mt-6 space-y-6" onSubmit={handleSubmit}>
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <input required name="fullName" value={patientForm.fullName} onChange={handleFieldChange} placeholder="Full name" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white xl:col-span-2" />
-                <input name="nationalId" value={patientForm.nationalId} onChange={handleFieldChange} placeholder="National ID" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white" />
-                <input name="passportNumber" value={patientForm.passportNumber} onChange={handleFieldChange} placeholder="Passport number" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white" />
-                <input required type="date" name="dateOfBirth" value={patientForm.dateOfBirth} onChange={handleFieldChange} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white" />
-                <select name="gender" value={patientForm.gender} onChange={handleFieldChange} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white"><option value="">Gender</option><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option></select>
-                <select name="status" value={patientForm.status} onChange={handleFieldChange} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white">{patientStatusOptions.map((status) => <option key={status} value={status}>{status}</option>)}</select>
-                <select name="patientType" value={patientForm.patientType} onChange={handleFieldChange} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white">{patientTypeOptions.map((type) => <option key={type} value={type}>{type}</option>)}</select>
-                <input required name="phone" value={patientForm.phone} onChange={handleFieldChange} placeholder="Primary phone" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white" />
-                <input type="email" name="email" value={patientForm.email} onChange={handleFieldChange} placeholder="Email" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white xl:col-span-2" />
-                <input name="province" value={patientForm.province} onChange={handleFieldChange} placeholder="Province" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white" />
-                <input name="city" value={patientForm.city} onChange={handleFieldChange} placeholder="City" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white" />
-                <input name="address" value={patientForm.address} onChange={handleFieldChange} placeholder="Address" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white xl:col-span-2" />
-                <textarea name="phoneNumbersText" value={patientForm.phoneNumbersText} onChange={handleFieldChange} placeholder="Other phone numbers, one per line" className="min-h-24 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white xl:col-span-2" />
-                <textarea name="familyMemberIdsText" value={patientForm.familyMemberIdsText} onChange={handleFieldChange} placeholder="Linked family patient IDs, one per line" className="min-h-24 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white xl:col-span-2" />
-              </div>
+          ))}
+        </div>
 
-              <div className="grid gap-4 lg:grid-cols-2">
-                <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-                  <h4 className="text-base font-semibold text-slate-950">Risk & Dental Profile</h4>
-                  <div className="mt-4 grid gap-3">
-                    <select name="riskLevel" value={patientForm.riskLevel} onChange={handleFieldChange} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400">{riskLevelOptions.map((level) => <option key={level} value={level}>{level}</option>)}</select>
-                    <select value={patientForm.medicalConditions.pregnancyStatus} onChange={(event) => updateNested("medicalConditions", "pregnancyStatus", event.target.value)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400">{pregnancyStatusOptions.map((status) => <option key={status} value={status}>{status}</option>)}</select>
-                    <textarea name="medicalHistory" value={patientForm.medicalHistory} onChange={handleFieldChange} placeholder="Medical history" className="min-h-20 rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400" />
-                    <textarea name="allergies" value={patientForm.allergies} onChange={handleFieldChange} placeholder="Allergies summary" className="min-h-20 rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400" />
-                    <input value={patientForm.oralHealthHistory.gumDiseaseHistory} onChange={(event) => updateNested("oralHealthHistory", "gumDiseaseHistory", event.target.value)} placeholder="Gum disease history" className="rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400" />
-                    <input value={patientForm.oralHealthHistory.cavitiesHistory} onChange={(event) => updateNested("oralHealthHistory", "cavitiesHistory", event.target.value)} placeholder="Cavities history" className="rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400" />
-                    <input value={patientForm.oralHealthHistory.orthodonticHistory} onChange={(event) => updateNested("oralHealthHistory", "orthodonticHistory", event.target.value)} placeholder="Orthodontic history" className="rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400" />
-                    <input value={patientForm.oralHealthHistory.implantsCrownsBridges} onChange={(event) => updateNested("oralHealthHistory", "implantsCrownsBridges", event.target.value)} placeholder="Implants / crowns / bridges" className="rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400" />
-                    <input value={patientForm.oralHealthHistory.missingTeethRecord} onChange={(event) => updateNested("oralHealthHistory", "missingTeethRecord", event.target.value)} placeholder="Missing teeth record" className="rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400" />
+        {/* Status banners */}
+        {isLoading && (
+          <div className="flex items-center gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-700">
+            <svg className="h-4 w-4 animate-spin shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="8" cy="8" r="6" strokeOpacity=".25"/><path d="M14 8a6 6 0 0 0-6-6" strokeLinecap="round"/>
+            </svg>
+            Loading patient data…
+          </div>
+        )}
+        {errorMessage && (
+          <div className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="mt-0.5 h-4 w-4 shrink-0">
+              <circle cx="8" cy="8" r="7"/><path d="M8 5v3M8 11h.01"/>
+            </svg>
+            {errorMessage}
+          </div>
+        )}
+
+        {/* ── Create / Edit Form ───────────────────────────────────── */}
+        {showForm && (
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+              <div>
+                <h2 className="text-base font-bold text-slate-900">{editingPatientId ? "Edit Patient Profile" : "New Patient Profile"}</h2>
+                <p className="mt-0.5 text-xs text-slate-500">Fill in the patient details below, then save.</p>
+              </div>
+              <button type="button" onClick={resetForm} className="rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50">
+                Cancel
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-5 p-6">
+              {/* Core info */}
+              <FormSection title="Personal Information">
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <div className="xl:col-span-2">
+                    <FieldLabel>Full Name *</FieldLabel>
+                    <input required name="fullName" value={patientForm.fullName} onChange={handleFieldChange} placeholder="Sophea Chan" className={input} />
+                  </div>
+                  <div>
+                    <FieldLabel>National ID</FieldLabel>
+                    <input name="nationalId" value={patientForm.nationalId} onChange={handleFieldChange} placeholder="ID number" className={input} />
+                  </div>
+                  <div>
+                    <FieldLabel>Passport</FieldLabel>
+                    <input name="passportNumber" value={patientForm.passportNumber} onChange={handleFieldChange} placeholder="Passport no." className={input} />
+                  </div>
+                  <div>
+                    <FieldLabel>Date of Birth *</FieldLabel>
+                    <input required type="date" name="dateOfBirth" value={patientForm.dateOfBirth} onChange={handleFieldChange} className={input} />
+                    {patientForm.dateOfBirth && (
+                      <p className="mt-1 text-[11px] text-slate-400">Age: {calcAge(patientForm.dateOfBirth)} years</p>
+                    )}
+                  </div>
+                  <div>
+                    <FieldLabel>Gender</FieldLabel>
+                    <select name="gender" value={patientForm.gender} onChange={handleFieldChange} className={input}>
+                      <option value="">Select gender</option>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <FieldLabel>Status</FieldLabel>
+                    <select name="status" value={patientForm.status} onChange={handleFieldChange} className={input}>
+                      {patientStatusOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <FieldLabel>Patient Type</FieldLabel>
+                    <select name="patientType" value={patientForm.patientType} onChange={handleFieldChange} className={input}>
+                      {patientTypeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <FieldLabel>Primary Phone *</FieldLabel>
+                    <input required name="phone" value={patientForm.phone} onChange={handleFieldChange} placeholder="+855 12 345 678" className={input} />
+                  </div>
+                  <div className="xl:col-span-2">
+                    <FieldLabel>Email</FieldLabel>
+                    <input type="email" name="email" value={patientForm.email} onChange={handleFieldChange} placeholder="patient@email.com" className={input} />
+                  </div>
+                  <div>
+                    <FieldLabel>Province</FieldLabel>
+                    <input name="province" value={patientForm.province} onChange={handleFieldChange} placeholder="Phnom Penh" className={input} />
+                  </div>
+                  <div>
+                    <FieldLabel>City</FieldLabel>
+                    <input name="city" value={patientForm.city} onChange={handleFieldChange} placeholder="Chamkarmon" className={input} />
+                  </div>
+                  <div className="xl:col-span-2">
+                    <FieldLabel>Address</FieldLabel>
+                    <input name="address" value={patientForm.address} onChange={handleFieldChange} placeholder="Street address" className={input} />
                   </div>
                 </div>
+              </FormSection>
+
+              {/* Medical + Insurance */}
+              <div className="grid gap-4 lg:grid-cols-2">
+                <FormSection title="Medical & Dental History">
+                  <div>
+                    <FieldLabel>Risk Level</FieldLabel>
+                    <select name="riskLevel" value={patientForm.riskLevel} onChange={handleFieldChange} className={input}>
+                      {riskLevelOptions.map((r) => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <FieldLabel>Pregnancy Status</FieldLabel>
+                    <select value={patientForm.medicalConditions.pregnancyStatus} onChange={(e) => updateNested("medicalConditions", "pregnancyStatus", e.target.value)} className={input}>
+                      {pregnancyStatusOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <FieldLabel>Medical History</FieldLabel>
+                    <textarea name="medicalHistory" value={patientForm.medicalHistory} onChange={handleFieldChange} placeholder="Known conditions, medications…" rows={3} className={`${input} resize-none`} />
+                  </div>
+                  <div>
+                    <FieldLabel>Allergies</FieldLabel>
+                    <textarea name="allergies" value={patientForm.allergies} onChange={handleFieldChange} placeholder="Drug allergies, latex, etc." rows={2} className={`${input} resize-none`} />
+                  </div>
+                  <div>
+                    <FieldLabel>Gum Disease History</FieldLabel>
+                    <input value={patientForm.oralHealthHistory.gumDiseaseHistory} onChange={(e) => updateNested("oralHealthHistory", "gumDiseaseHistory", e.target.value)} placeholder="Notes" className={input} />
+                  </div>
+                  <div>
+                    <FieldLabel>Cavities History</FieldLabel>
+                    <input value={patientForm.oralHealthHistory.cavitiesHistory} onChange={(e) => updateNested("oralHealthHistory", "cavitiesHistory", e.target.value)} placeholder="Notes" className={input} />
+                  </div>
+                </FormSection>
 
                 <div className="space-y-4">
-                  <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-                    <h4 className="text-base font-semibold text-slate-950">Insurance & Payment</h4>
-                    <div className="mt-4 grid gap-3">
-                      <input name="insuranceProvider" value={patientForm.insuranceProvider} onChange={handleFieldChange} placeholder="Insurance provider" className="rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400" />
-                      <input name="policyNumber" value={patientForm.policyNumber} onChange={handleFieldChange} placeholder="Policy number" className="rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400" />
-                      <input type="number" name="coverageLimit" value={patientForm.coverageLimit ?? ""} onChange={handleFieldChange} placeholder="Coverage limit" className="rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400" />
-                      <input type="date" name="insuranceExpiry" value={patientForm.insuranceExpiry} onChange={handleFieldChange} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400" />
-                      <select name="billingPreference" value={patientForm.billingPreference} onChange={handleFieldChange} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400">{billingPreferenceOptions.map((option) => <option key={option} value={option}>{option}</option>)}</select>
-                      <input type="number" name="creditBalance" value={patientForm.creditBalance} onChange={handleFieldChange} placeholder="Credit balance" className="rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400" />
+                  <FormSection title="Insurance & Billing">
+                    <div>
+                      <FieldLabel>Insurance Provider</FieldLabel>
+                      <input name="insuranceProvider" value={patientForm.insuranceProvider} onChange={handleFieldChange} placeholder="Provider name" className={input} />
                     </div>
-                  </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <FieldLabel>Policy Number</FieldLabel>
+                        <input name="policyNumber" value={patientForm.policyNumber} onChange={handleFieldChange} placeholder="Policy no." className={input} />
+                      </div>
+                      <div>
+                        <FieldLabel>Coverage Limit</FieldLabel>
+                        <input type="number" name="coverageLimit" value={patientForm.coverageLimit ?? ""} onChange={handleFieldChange} placeholder="0.00" className={input} />
+                      </div>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <FieldLabel>Insurance Expiry</FieldLabel>
+                        <input type="date" name="insuranceExpiry" value={patientForm.insuranceExpiry} onChange={handleFieldChange} className={input} />
+                      </div>
+                      <div>
+                        <FieldLabel>Billing Preference</FieldLabel>
+                        <select name="billingPreference" value={patientForm.billingPreference} onChange={handleFieldChange} className={input}>
+                          {billingPreferenceOptions.map((o) => <option key={o} value={o}>{o}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                  </FormSection>
 
-                  <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-                    <h4 className="text-base font-semibold text-slate-950">Contacts & Preferences</h4>
-                    <div className="mt-4 grid gap-3">
-                      <input name="emergencyContactName" value={patientForm.emergencyContactName} onChange={handleFieldChange} placeholder="Emergency contact name" className="rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400" />
-                      <input name="emergencyContactRelation" value={patientForm.emergencyContactRelation} onChange={handleFieldChange} placeholder="Relationship" className="rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400" />
-                      <input name="emergencyContactPhone" value={patientForm.emergencyContactPhone} onChange={handleFieldChange} placeholder="Emergency phone" className="rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400" />
-                      <input name="secondaryContactName" value={patientForm.secondaryContactName} onChange={handleFieldChange} placeholder="Secondary contact name" className="rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400" />
-                      <input name="secondaryContactPhone" value={patientForm.secondaryContactPhone} onChange={handleFieldChange} placeholder="Secondary phone" className="rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400" />
-                      <select value={patientForm.communicationPreferences.preferredContactMethod} onChange={(event) => updateNested("communicationPreferences", "preferredContactMethod", event.target.value)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400">{preferredContactMethodOptions.map((option) => <option key={option} value={option}>{option}</option>)}</select>
-                      <select value={patientForm.settings.privacyLevel} onChange={(event) => updateNested("settings", "privacyLevel", event.target.value)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-sky-400">{privacyLevelOptions.map((option) => <option key={option} value={option}>{option}</option>)}</select>
+                  <FormSection title="Emergency Contacts">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <FieldLabel>Name</FieldLabel>
+                        <input name="emergencyContactName" value={patientForm.emergencyContactName} onChange={handleFieldChange} placeholder="Contact name" className={input} />
+                      </div>
+                      <div>
+                        <FieldLabel>Relationship</FieldLabel>
+                        <input name="emergencyContactRelation" value={patientForm.emergencyContactRelation} onChange={handleFieldChange} placeholder="e.g. Spouse" className={input} />
+                      </div>
                     </div>
-                  </div>
+                    <div>
+                      <FieldLabel>Emergency Phone</FieldLabel>
+                      <input name="emergencyContactPhone" value={patientForm.emergencyContactPhone} onChange={handleFieldChange} placeholder="+855 …" className={input} />
+                    </div>
+                    <div>
+                      <FieldLabel>Preferred Contact Method</FieldLabel>
+                      <select value={patientForm.communicationPreferences.preferredContactMethod} onChange={(e) => updateNested("communicationPreferences", "preferredContactMethod", e.target.value)} className={input}>
+                        {preferredContactMethodOptions.map((o) => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <FieldLabel>Privacy Level</FieldLabel>
+                      <select value={patientForm.settings.privacyLevel} onChange={(e) => updateNested("settings", "privacyLevel", e.target.value)} className={input}>
+                        {privacyLevelOptions.map((o) => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                    </div>
+                  </FormSection>
                 </div>
               </div>
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <label className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-4"><span className="text-sm font-medium text-slate-700">Documents</span><input type="file" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onChange={(event) => handleFiles(event, "documents")} className="mt-2 w-full text-sm text-slate-500" /></label>
-                <label className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-4"><span className="text-sm font-medium text-slate-700">Insurance Cards</span><input type="file" multiple accept=".pdf,.jpg,.jpeg,.png" onChange={(event) => handleFiles(event, "insuranceCards")} className="mt-2 w-full text-sm text-slate-500" /></label>
-                <label className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-4"><span className="text-sm font-medium text-slate-700">Consent Forms</span><input type="file" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onChange={(event) => handleFiles(event, "consentForms")} className="mt-2 w-full text-sm text-slate-500" /></label>
-                <label className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-4"><span className="text-sm font-medium text-slate-700">X-Rays</span><input type="file" multiple accept=".jpg,.jpeg,.png,.dcm" onChange={(event) => handleFiles(event, "xrays")} className="mt-2 w-full text-sm text-slate-500" /></label>
+
+              {/* File uploads */}
+              <FormSection title="Attachments">
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  {[
+                    { label: "Documents", type: "documents" as const, accept: ".pdf,.doc,.docx,.jpg,.jpeg,.png" },
+                    { label: "Insurance Cards", type: "insuranceCards" as const, accept: ".pdf,.jpg,.jpeg,.png" },
+                    { label: "Consent Forms", type: "consentForms" as const, accept: ".pdf,.doc,.docx,.jpg,.jpeg,.png" },
+                    { label: "X-Rays", type: "xrays" as const, accept: ".jpg,.jpeg,.png,.dcm" },
+                  ].map((f) => (
+                    <label key={f.type} className="cursor-pointer rounded-xl border border-dashed border-slate-300 bg-white p-3 transition hover:border-sky-400 hover:bg-sky-50">
+                      <p className="text-xs font-semibold text-slate-700">{f.label}</p>
+                      <input type="file" multiple accept={f.accept} onChange={(e) => handleFiles(e, f.type)} className="mt-2 w-full text-xs text-slate-500 file:mr-2 file:rounded-lg file:border-0 file:bg-slate-100 file:px-2 file:py-1 file:text-xs file:font-semibold" />
+                    </label>
+                  ))}
+                </div>
+              </FormSection>
+
+              {/* Submit */}
+              <div className="flex items-center gap-3 pt-2">
+                <button type="submit" disabled={isSaving} className="flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50">
+                  {isSaving ? (
+                    <><svg className="h-4 w-4 animate-spin" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="8" cy="8" r="6" strokeOpacity=".3"/><path d="M14 8a6 6 0 0 0-6-6" strokeLinecap="round"/></svg>{editingPatientId ? "Updating…" : "Saving…"}</>
+                  ) : (editingPatientId ? "Update Patient" : "Save Patient")}
+                </button>
+                <button type="button" onClick={resetForm} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
+                  Cancel
+                </button>
               </div>
-              <button type="submit" disabled={isSaving} className="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300">{isSaving ? (editingPatientId ? "Updating Patient..." : "Saving Patient...") : (editingPatientId ? "Update Patient Profile" : "Save Patient Profile")}</button>
             </form>
-          </section>
+          </div>
+        )}
 
-          <aside className="space-y-6">
-            <section className="rounded-[28px] border border-white/80 bg-white/85 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
-              <h3 className="text-xl font-semibold text-slate-950">Quick Search</h3>
-              <input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Name, phone, patient ID, national ID" className="mt-4 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white" />
-              <p className="mt-3 text-sm text-slate-500">Matches: {filteredPatients.length}</p>
-              <p className="mt-1 text-sm text-slate-500">Current intake age: {calculatePatientAge(patientForm.dateOfBirth) ?? "Not set"}</p>
-            </section>
+        {/* ── Search + Patient List ─────────────────────────────────── */}
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-base font-bold text-slate-900">Patient Directory</h2>
+              <p className="mt-0.5 text-xs text-slate-500">{filteredPatients.length} of {patients.length} records shown</p>
+            </div>
+            <div className="relative w-full sm:w-72">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400">
+                <circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/>
+              </svg>
+              <input
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Name, phone, patient ID…"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3.5 text-sm outline-none transition focus:border-sky-400 focus:bg-white focus:ring-2 focus:ring-sky-100"
+              />
+            </div>
+          </div>
 
-            <section className="rounded-[28px] border border-white/80 bg-slate-950 p-6 text-white shadow-[0_20px_50px_rgba(15,23,42,0.16)]">
-              <p className="text-xs uppercase tracking-[0.28em] text-cyan-200/75">Patient Profiles</p>
-              <h3 className="mt-2 text-xl font-semibold">Search Results</h3>
-              <div className="mt-4 space-y-3">
-                {filteredPatients.length === 0 ? <p className="rounded-2xl bg-white/10 p-4 text-sm text-slate-300">No patient profiles match your search.</p> : filteredPatients.map((patient) => (
-                  <article key={patient.id} className="rounded-3xl border border-white/10 bg-white/6 p-4">
-                    <Link href={`/patients/${patient.id}`} className="block min-w-0 transition hover:opacity-90">
-                      <div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-white">{patient.fullName}</p><span className="rounded-full bg-cyan-300 px-3 py-1 text-[11px] font-semibold text-slate-950">{patient.patientId}</span></div>
-                      <p className="mt-1 text-sm text-slate-300">{patient.phone}{patient.email ? ` | ${patient.email}` : ""}</p>
-                      <p className="mt-2 text-xs uppercase tracking-[0.24em] text-cyan-200/70">{patient.status} | {patient.patientType} | Registered {formatDateLabel(patient.registrationDate)}</p>
-                    </Link>
-                    <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                      {patient.alertFlags.unpaidBills ? <span className="rounded-full bg-amber-100 px-3 py-1 font-semibold text-amber-800">Unpaid bills</span> : null}
-                      {patient.alertFlags.highRiskMedical ? <span className="rounded-full bg-rose-100 px-3 py-1 font-semibold text-rose-800">High risk</span> : null}
-                      {patient.alertFlags.frequentNoShow ? <span className="rounded-full bg-violet-100 px-3 py-1 font-semibold text-violet-800">No-show</span> : null}
-                      {patient.alertFlags.vip ? <span className="rounded-full bg-emerald-100 px-3 py-1 font-semibold text-emerald-800">VIP</span> : null}
-                    </div>
-                    <div className="mt-4 grid grid-cols-2 gap-3 text-xs text-slate-300">
-                      <div className="rounded-2xl bg-white/8 p-3"><p>Total Visits</p><p className="mt-1 text-base font-semibold text-white">{patient.analytics?.totalVisits ?? 0}</p></div>
-                      <div className="rounded-2xl bg-white/8 p-3"><p>Total Revenue</p><p className="mt-1 text-base font-semibold text-white">{currency(patient.analytics?.totalRevenue ?? 0)}</p></div>
-                    </div>
-                    {patient.duplicateCandidates && patient.duplicateCandidates.length > 0 ? <div className="mt-4 rounded-2xl bg-amber-50 p-4 text-slate-900 ring-1 ring-amber-100"><p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">Duplicate Candidates</p>{patient.duplicateCandidates.slice(0, 2).map((candidate) => <div key={`${patient.id}-${candidate.patientId}`} className="mt-3 rounded-2xl bg-white px-3 py-3 ring-1 ring-amber-100"><p className="text-sm font-semibold text-slate-900">{candidate.fullName}</p><p className="mt-1 text-xs text-slate-600">{candidate.reason}</p><button type="button" onClick={() => handleMergePatient(patient.id, candidate.patientId)} disabled={mergingPatientId === patient.id} className="mt-3 rounded-full bg-slate-950 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400">{mergingPatientId === patient.id ? "Merging..." : "Merge Into Candidate"}</button></div>)}</div> : null}
-                    <div className="mt-4 flex gap-2">
-                      <button type="button" onClick={() => handleEditPatient(patient)} className="rounded-2xl bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-100">Edit</button>
-                      <button type="button" onClick={() => handleDeletePatient(patient.id)} disabled={deletingPatientId === patient.id} className="rounded-2xl bg-rose-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-400 disabled:cursor-not-allowed disabled:bg-rose-300">{deletingPatientId === patient.id ? "Deleting..." : "Delete"}</button>
-                    </div>
-                  </article>
-                ))}
+          {filteredPatients.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 py-16">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-slate-400">
+                  <circle cx="8" cy="6" r="3"/><path d="M2 18c0-3.3 2.7-6 6-6h4"/>
+                </svg>
               </div>
-            </section>
-          </aside>
+              <p className="text-sm font-medium text-slate-500">{searchTerm ? "No patients match your search" : "No patients added yet"}</p>
+              <button type="button" onClick={() => setShowForm(true)} className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-slate-800">
+                Add First Patient
+              </button>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-50">
+              {filteredPatients.map((patient) => (
+                <div key={patient.id} className="flex flex-col gap-4 px-5 py-4 transition hover:bg-slate-50 sm:flex-row sm:items-start">
+                  {/* Avatar + info */}
+                  <div className="flex flex-1 items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 text-sm font-bold text-white shadow-sm">
+                      {initials(patient.fullName)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Link href={`/patients/${patient.id}`} className="text-sm font-bold text-slate-900 hover:text-sky-600 hover:underline">
+                          {patient.fullName}
+                        </Link>
+                        <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-bold text-sky-700">{patient.patientId}</span>
+                        {patient.alertFlags.vip && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">VIP</span>}
+                        {patient.alertFlags.highRiskMedical && <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-700">High Risk</span>}
+                        {patient.alertFlags.unpaidBills && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">Unpaid</span>}
+                        {patient.alertFlags.frequentNoShow && <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-700">No-show</span>}
+                      </div>
+                      <p className="mt-0.5 text-xs text-slate-500">{patient.phone}{patient.email ? ` · ${patient.email}` : ""}</p>
+                      <p className="mt-0.5 text-[11px] text-slate-400 capitalize">{patient.status} · {patient.patientType} · Registered {fmtDate(patient.registrationDate)}</p>
+                    </div>
+                  </div>
+
+                  {/* Stats */}
+                  <div className="flex items-center gap-4 text-xs">
+                    <div className="text-center">
+                      <p className="font-bold text-slate-900">{patient.analytics?.totalVisits ?? 0}</p>
+                      <p className="text-slate-400">Visits</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="font-bold text-slate-900">{usd(patient.analytics?.totalRevenue ?? 0)}</p>
+                      <p className="text-slate-400">Revenue</p>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button type="button" onClick={() => handleEdit(patient)} className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 hover:border-slate-300">
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(patient.id)}
+                      disabled={deletingPatientId === patient.id}
+                      className="rounded-xl bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-rose-500 disabled:opacity-50"
+                    >
+                      {deletingPatientId === patient.id ? "Deleting…" : "Delete"}
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {/* Duplicate warnings */}
+              {filteredPatients.filter((p) => (p.duplicateCandidates?.length ?? 0) > 0).map((patient) => (
+                <div key={`dup-${patient.id}`} className="border-l-4 border-amber-400 bg-amber-50 px-5 py-4">
+                  <p className="mb-2 text-xs font-bold uppercase tracking-widest text-amber-700">Possible Duplicate — {patient.fullName}</p>
+                  {patient.duplicateCandidates!.slice(0, 2).map((c) => (
+                    <div key={`${patient.id}-${c.patientId}`} className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-white px-4 py-3">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">{c.fullName}</p>
+                        <p className="mt-0.5 text-xs text-slate-500">{c.reason}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleMerge(patient.id, c.patientId)}
+                        disabled={mergingPatientId === patient.id}
+                        className="shrink-0 rounded-xl bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-amber-500 disabled:opacity-50"
+                      >
+                        {mergingPatientId === patient.id ? "Merging…" : "Merge"}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
+
       </div>
     </AdminShell>
   );

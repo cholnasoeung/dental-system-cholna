@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useState } from "react";
+import { ChangeEvent, useEffect, useState } from "react";
 
 import { AdminShell } from "@/components/admin-shell";
 import {
@@ -11,34 +11,21 @@ import {
   type PaymentFormState,
 } from "@/lib/clinic-types";
 
-function currency(amount: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(amount);
+const input = "w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-2 focus:ring-sky-100";
+const lbl = "mb-1.5 block text-[11px] font-semibold uppercase tracking-widest text-slate-500";
+
+function usd(n: number) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
 }
-
-function formatDateLabel(date: string) {
-  if (!date) {
-    return "Not set";
-  }
-
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(date));
+function fmtDate(d: string) {
+  if (!d) return "—";
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(d));
 }
-
-function invoiceTotal(invoice: Invoice) {
-  return invoice.lineItems.reduce(
-    (sum, item) => sum + item.quantity * item.unitPrice,
-    0,
-  );
+function invoiceTotal(inv: Invoice) {
+  return inv.lineItems.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
 }
-
-function invoicePaid(invoice: Invoice) {
-  return invoice.payments.reduce((sum, payment) => sum + payment.amount, 0);
+function invoicePaid(inv: Invoice) {
+  return inv.payments.reduce((s, p) => s + p.amount, 0);
 }
 
 export default function BillingPage() {
@@ -52,390 +39,212 @@ export default function BillingPage() {
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
-    async function loadBillingData() {
+    async function load() {
       try {
         setIsLoading(true);
-        setErrorMessage("");
-
-        const [patientsResponse, invoicesResponse] = await Promise.all([
+        const [pRes, iRes] = await Promise.all([
           fetch("/api/patients", { cache: "no-store" }),
           fetch("/api/billing", { cache: "no-store" }),
         ]);
-
-        if (!patientsResponse.ok || !invoicesResponse.ok) {
-          throw new Error(
-            `${patientsResponse.ok ? "" : await patientsResponse.text()} ${
-              invoicesResponse.ok ? "" : await invoicesResponse.text()
-            }`.trim(),
-          );
-        }
-
-        const [patientsData, invoicesData] = await Promise.all([
-          (await patientsResponse.json()) as PatientProfile[],
-          (await invoicesResponse.json()) as Invoice[],
-        ]);
-
-        setPatients(patientsData);
-        setInvoices(invoicesData);
-        setSelectedInvoiceId(invoicesData[0]?.id ?? "");
-      } catch (error) {
-        console.error(error);
-        setErrorMessage(
-          error instanceof Error ? error.message : "Unable to load billing data.",
-        );
-      } finally {
-        setIsLoading(false);
-      }
+        if (!pRes.ok || !iRes.ok) throw new Error("Unable to load billing data.");
+        const [p, inv] = await Promise.all([pRes.json() as Promise<PatientProfile[]>, iRes.json() as Promise<Invoice[]>]);
+        setPatients(p);
+        setInvoices(inv);
+        setSelectedInvoiceId(inv[0]?.id ?? "");
+      } catch (e) {
+        setErrorMessage(e instanceof Error ? e.message : "Unable to load billing data.");
+      } finally { setIsLoading(false); }
     }
-
-    loadBillingData();
+    void load();
   }, []);
 
-  function handlePaymentFieldChange(
-    event: ChangeEvent<HTMLInputElement | HTMLSelectElement>,
-  ) {
-    const { name, value } = event.target;
-    setPaymentForm((current) => ({
-      ...current,
-      [name]: name === "amount" ? Number(value) : value,
-    }));
+  function handlePaymentChange(e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
+    const { name, value } = e.target;
+    setPaymentForm((c) => ({ ...c, [name]: name === "amount" ? Number(value) : value }));
   }
 
-  const visibleInvoices = invoices.filter((invoice) =>
-    selectedPatientId ? invoice.patientId === selectedPatientId : true,
-  );
+  const visibleInvoices = invoices.filter((inv) => selectedPatientId ? inv.patientId === selectedPatientId : true);
+  const selectedInvoice = visibleInvoices.find((inv) => inv.id === selectedInvoiceId) ?? visibleInvoices[0] ?? null;
+  const selTotal = selectedInvoice ? invoiceTotal(selectedInvoice) : 0;
+  const selPaid  = selectedInvoice ? invoicePaid(selectedInvoice) : 0;
+  const selOuts  = Math.max(selTotal - selPaid, 0);
 
-  const selectedInvoice =
-    visibleInvoices.find((invoice) => invoice.id === selectedInvoiceId) ??
-    visibleInvoices[0] ??
-    null;
+  const totalRevenue     = invoices.reduce((s, inv) => s + invoicePaid(inv), 0);
+  const totalOutstanding = invoices.reduce((s, inv) => s + Math.max(invoiceTotal(inv) - invoicePaid(inv), 0), 0);
 
-  async function handlePaymentSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (!selectedInvoice || paymentForm.amount <= 0 || !paymentForm.paidAt) {
-      return;
-    }
-
+  async function handlePaymentSubmit(e: { preventDefault(): void }) {
+    e.preventDefault();
+    if (!selectedInvoice || paymentForm.amount <= 0 || !paymentForm.paidAt) return;
     try {
-      setIsSaving(true);
-      setErrorMessage("");
-
-      const response = await fetch(`/api/billing/${selectedInvoice.id}`, {
+      setIsSaving(true); setErrorMessage("");
+      const res = await fetch(`/api/billing/${selectedInvoice.id}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          appendPayment: paymentForm,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ appendPayment: paymentForm }),
       });
-
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
-
-      setInvoices((current) =>
-        current.map((invoice) =>
-          invoice.id === selectedInvoice.id
-            ? { ...invoice, payments: [...invoice.payments, paymentForm] }
-            : invoice,
-        ),
-      );
+      if (!res.ok) throw new Error(await res.text());
+      setInvoices((cur) => cur.map((inv) =>
+        inv.id === selectedInvoice.id ? { ...inv, payments: [...inv.payments, paymentForm] } : inv,
+      ));
       setPaymentForm(initialPaymentForm);
-    } catch (error) {
-      console.error(error);
-      setErrorMessage(
-        error instanceof Error ? error.message : "Payment could not be recorded.",
-      );
-    } finally {
-      setIsSaving(false);
-    }
+    } catch (e) {
+      setErrorMessage(e instanceof Error ? e.message : "Payment could not be recorded.");
+    } finally { setIsSaving(false); }
   }
-
-  const totalRevenue = invoices.reduce((sum, invoice) => sum + invoicePaid(invoice), 0);
-  const totalOutstanding = invoices.reduce(
-    (sum, invoice) => sum + Math.max(invoiceTotal(invoice) - invoicePaid(invoice), 0),
-    0,
-  );
-  const autoGeneratedInvoices = invoices.filter((invoice) => invoice.autoGenerated);
-  const selectedInvoiceTotal = selectedInvoice ? invoiceTotal(selectedInvoice) : 0;
-  const selectedInvoicePaid = selectedInvoice ? invoicePaid(selectedInvoice) : 0;
-  const selectedInvoiceOutstanding = Math.max(
-    selectedInvoiceTotal - selectedInvoicePaid,
-    0,
-  );
 
   return (
     <AdminShell>
-      <div className="w-full space-y-6 print:space-y-0">
-        <header className="rounded-[28px] border border-white/80 bg-white/80 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)] print:hidden">
-          <p className="text-xs font-semibold uppercase tracking-[0.35em] text-sky-700">
-            Module D
-          </p>
-          <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <h2 className="text-3xl font-semibold tracking-tight text-slate-950">
-                Billing & Payments
-              </h2>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                Invoice charges are now generated automatically from billable
-                treatments selected in EMR. Staff only need to review charges and
-                record the payment received.
-              </p>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="rounded-2xl bg-slate-950 px-4 py-3 text-white">
-                <p className="text-xs uppercase tracking-[0.22em] text-cyan-200">
-                  Invoices
-                </p>
-                <p className="mt-2 text-2xl font-semibold">{invoices.length}</p>
-              </div>
-              <div className="rounded-2xl bg-sky-50 px-4 py-3 ring-1 ring-sky-100">
-                <p className="text-xs uppercase tracking-[0.22em] text-slate-500">
-                  Revenue
-                </p>
-                <p className="mt-2 text-2xl font-semibold text-slate-900">
-                  {currency(totalRevenue)}
-                </p>
-              </div>
-              <div className="rounded-2xl bg-sky-50 px-4 py-3 ring-1 ring-sky-100">
-                <p className="text-xs uppercase tracking-[0.22em] text-slate-500">
-                  Outstanding
-                </p>
-                <p className="mt-2 text-2xl font-semibold text-slate-900">
-                  {currency(totalOutstanding)}
-                </p>
-              </div>
-            </div>
-          </div>
-        </header>
+      <div className="mx-auto max-w-[1400px] space-y-6 print:space-y-0">
 
-        {isLoading ? (
-          <div className="rounded-[24px] border border-sky-100 bg-sky-50 px-5 py-4 text-sm text-sky-800 print:hidden">
-            Loading billing data from MongoDB...
-          </div>
-        ) : null}
-
-        {errorMessage ? (
-          <div className="rounded-[24px] border border-rose-100 bg-rose-50 px-5 py-4 text-sm text-rose-700 print:hidden">
-            {errorMessage}
-          </div>
-        ) : null}
-
+        {/* ── Print layout ─────────────────────────────────────────── */}
         <div className="hidden print:block">
-          <section className="rounded-none border-0 bg-white p-0 text-slate-950 shadow-none">
-            <div className="border-b border-slate-200 pb-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-sky-700">
-                Payment Receipt
-              </p>
-              <h1 className="mt-2 text-3xl font-semibold">Smile Care Center</h1>
-              <p className="mt-1 text-sm text-slate-500">
-                Generated {new Date().toLocaleString()}
-              </p>
-            </div>
-
-            {!selectedInvoice ? (
-              <p className="pt-6 text-sm text-slate-600">No invoice selected for printing.</p>
-            ) : (
-              <div className="space-y-6 pt-6">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
-                      Patient
-                    </p>
-                    <p className="mt-1 font-semibold">{selectedInvoice.patientName}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
-                      Invoice Number
-                    </p>
-                    <p className="mt-1 font-semibold">{selectedInvoice.invoiceNumber}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
-                      Visit Date
-                    </p>
-                    <p className="mt-1 font-semibold">
-                      {formatDateLabel(selectedInvoice.issueDate)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
-                      Linked EMR
-                    </p>
-                    <p className="mt-1 font-semibold">
-                      {selectedInvoice.linkedRecordId || "Not linked"}
-                    </p>
-                  </div>
-                </div>
-
-                <div>
-                  <h2 className="text-lg font-semibold">Charges</h2>
-                  <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200">
-                    <table className="w-full border-collapse text-sm">
-                      <thead className="bg-slate-50">
-                        <tr>
-                          <th className="px-4 py-3 text-left font-semibold">Treatment</th>
-                          <th className="px-4 py-3 text-left font-semibold">Teeth</th>
-                          <th className="px-4 py-3 text-right font-semibold">Qty</th>
-                          <th className="px-4 py-3 text-right font-semibold">Unit Price</th>
-                          <th className="px-4 py-3 text-right font-semibold">Amount</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {selectedInvoice.lineItems.map((item, index) => (
-                          <tr key={`${item.treatmentId}-${index}`} className="border-t border-slate-200">
-                            <td className="px-4 py-3">{item.treatment}</td>
-                            <td className="px-4 py-3">
-                              {item.toothNumbers.length > 0 ? item.toothNumbers.join(", ") : "-"}
-                            </td>
-                            <td className="px-4 py-3 text-right">{item.quantity}</td>
-                            <td className="px-4 py-3 text-right">{currency(item.unitPrice)}</td>
-                            <td className="px-4 py-3 text-right">
-                              {currency(item.quantity * item.unitPrice)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                <div>
-                  <h2 className="text-lg font-semibold">Payments</h2>
-                  <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200">
-                    <table className="w-full border-collapse text-sm">
-                      <thead className="bg-slate-50">
-                        <tr>
-                          <th className="px-4 py-3 text-left font-semibold">Date</th>
-                          <th className="px-4 py-3 text-left font-semibold">Method</th>
-                          <th className="px-4 py-3 text-left font-semibold">Reference</th>
-                          <th className="px-4 py-3 text-right font-semibold">Amount</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {selectedInvoice.payments.length === 0 ? (
-                          <tr className="border-t border-slate-200">
-                            <td colSpan={4} className="px-4 py-3 text-slate-500">
-                              No payments recorded.
-                            </td>
-                          </tr>
-                        ) : (
-                          selectedInvoice.payments.map((payment, index) => (
-                            <tr
-                              key={`${payment.method}-${payment.paidAt}-${index}`}
-                              className="border-t border-slate-200"
-                            >
-                              <td className="px-4 py-3">{formatDateLabel(payment.paidAt)}</td>
-                              <td className="px-4 py-3 capitalize">{payment.method}</td>
-                              <td className="px-4 py-3">{payment.reference || "-"}</td>
-                              <td className="px-4 py-3 text-right">{currency(payment.amount)}</td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                <div className="ml-auto grid w-[280px] gap-2 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Invoice Total</span>
-                    <span className="font-semibold">{currency(selectedInvoiceTotal)}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Paid</span>
-                    <span className="font-semibold">{currency(selectedInvoicePaid)}</span>
-                  </div>
-                  <div className="flex items-center justify-between border-t border-slate-200 pt-2">
-                    <span className="font-semibold">Outstanding</span>
-                    <span className="font-semibold">{currency(selectedInvoiceOutstanding)}</span>
-                  </div>
-                </div>
+          <div className="border-b border-slate-200 pb-4">
+            <p className="text-xs font-semibold uppercase tracking-widest text-sky-600">Payment Receipt</p>
+            <h1 className="mt-1 text-2xl font-bold text-slate-900">Smile Care Center</h1>
+            <p className="mt-0.5 text-sm text-slate-500">Generated {new Date().toLocaleString()}</p>
+          </div>
+          {selectedInvoice && (
+            <div className="space-y-5 pt-5">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                {[["Patient", selectedInvoice.patientName], ["Invoice #", selectedInvoice.invoiceNumber], ["Visit Date", fmtDate(selectedInvoice.issueDate)], ["Linked EMR", selectedInvoice.linkedRecordId || "Not linked"]].map(([k, v]) => (
+                  <div key={k}><p className="text-xs uppercase tracking-wider text-slate-500">{k}</p><p className="mt-0.5 font-semibold">{v}</p></div>
+                ))}
               </div>
-            )}
-          </section>
+              <table className="w-full border-collapse text-sm">
+                <thead><tr className="border-b border-slate-200 bg-slate-50 text-left">
+                  {["Treatment","Teeth","Qty","Unit Price","Amount"].map((h) => <th key={h} className="px-3 py-2 text-xs font-semibold">{h}</th>)}
+                </tr></thead>
+                <tbody>
+                  {selectedInvoice.lineItems.map((item, i) => (
+                    <tr key={`${item.treatmentId}-${i}`} className="border-b border-slate-100">
+                      <td className="px-3 py-2">{item.treatment}</td>
+                      <td className="px-3 py-2">{item.toothNumbers.join(", ") || "—"}</td>
+                      <td className="px-3 py-2">{item.quantity}</td>
+                      <td className="px-3 py-2">{usd(item.unitPrice)}</td>
+                      <td className="px-3 py-2 font-semibold">{usd(item.quantity * item.unitPrice)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="ml-auto w-64 space-y-1 text-sm">
+                <div className="flex justify-between"><span className="text-slate-500">Total</span><span className="font-semibold">{usd(selTotal)}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">Paid</span><span className="font-semibold text-emerald-700">{usd(selPaid)}</span></div>
+                <div className="flex justify-between border-t border-slate-200 pt-1"><span className="font-bold">Outstanding</span><span className="font-bold">{usd(selOuts)}</span></div>
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="grid gap-6 print:hidden xl:grid-cols-[380px_minmax(0,1fr)]">
-          <section className="rounded-[28px] border border-white/80 bg-white/85 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-xl font-semibold text-slate-950">Auto-Generated Invoices</h3>
-                <p className="mt-1 text-sm text-slate-500">
-                  Each invoice is linked to an EMR visit and updates when that record changes.
-                </p>
-              </div>
+        {/* ── Page Header ─────────────────────────────────────── print:hidden */}
+        <div className="flex flex-col gap-4 print:hidden sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-sky-600">Module D</p>
+            <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-slate-900">Billing & Payments</h1>
+            <p className="mt-1 text-sm text-slate-500">Auto-generated invoices from EMR — review charges and record payments.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => window.print()}
+            disabled={!selectedInvoice}
+            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 print:hidden"
+          >
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="h-3.5 w-3.5">
+              <path d="M4 6V2h8v4M4 12H2V7h12v5h-2M4 9h8M4 12v3h8v-3"/>
+            </svg>
+            Print PDF
+          </button>
+        </div>
 
-              <label className="space-y-1">
-                <span className="text-sm font-medium text-slate-700">Filter by Patient</span>
+        {/* KPIs */}
+        <div className="grid grid-cols-3 gap-3 print:hidden">
+          {[
+            { label: "Total Invoices", value: invoices.length, dark: true },
+            { label: "Revenue Collected", value: usd(totalRevenue), dark: false },
+            { label: "Outstanding", value: usd(totalOutstanding), dark: false, warn: totalOutstanding > 0 },
+          ].map((k) => (
+            <div key={k.label} className={`rounded-2xl border border-slate-200 px-4 py-3 shadow-sm ${k.dark ? "bg-slate-900" : k.warn ? "bg-amber-50" : "bg-white"}`}>
+              <p className={`text-[10px] font-semibold uppercase tracking-widest ${k.dark ? "text-slate-400" : "text-slate-400"}`}>{k.label}</p>
+              <p className={`mt-1.5 text-xl font-bold ${k.dark ? "text-white" : k.warn ? "text-amber-700" : "text-slate-900"}`}>{k.value}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Banners */}
+        {isLoading && (
+          <div className="flex items-center gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-700 print:hidden">
+            <svg className="h-4 w-4 animate-spin shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="8" cy="8" r="6" strokeOpacity=".25"/><path d="M14 8a6 6 0 0 0-6-6" strokeLinecap="round"/></svg>
+            Loading billing data…
+          </div>
+        )}
+        {errorMessage && (
+          <div className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 print:hidden">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="mt-0.5 h-4 w-4 shrink-0"><circle cx="8" cy="8" r="7"/><path d="M8 5v3M8 11h.01"/></svg>
+            {errorMessage}
+          </div>
+        )}
+
+        {/* ── Main grid ──────────────────────────────────────────────── */}
+        <div className="grid gap-5 print:hidden xl:grid-cols-[340px_1fr]">
+
+          {/* Invoice list */}
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="border-b border-slate-100 px-5 py-4">
+              <h2 className="text-base font-bold text-slate-900">Invoices</h2>
+              <div className="mt-3">
+                <label className={lbl}>Filter by Patient</label>
                 <select
                   value={selectedPatientId}
-                  onChange={(event) => {
-                    setSelectedPatientId(event.target.value);
-                    setSelectedInvoiceId("");
-                  }}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white"
+                  onChange={(e) => { setSelectedPatientId(e.target.value); setSelectedInvoiceId(""); }}
+                  className={input}
                 >
                   <option value="">All patients</option>
-                  {patients.map((patient) => (
-                    <option key={patient.id} value={patient.id}>
-                      {patient.fullName}
-                    </option>
-                  ))}
+                  {patients.map((p) => <option key={p.id} value={p.id}>{p.fullName}</option>)}
                 </select>
-              </label>
+              </div>
             </div>
 
-            <div className="mt-5 space-y-3">
+            <div className="divide-y divide-slate-50 overflow-y-auto" style={{ maxHeight: "560px" }}>
               {visibleInvoices.length === 0 ? (
-                <p className="rounded-2xl bg-slate-100 p-4 text-sm text-slate-600">
-                  No invoices found. Save a billable EMR record first to generate one automatically.
-                </p>
+                <div className="px-5 py-10 text-center">
+                  <p className="text-sm text-slate-400">No invoices found.</p>
+                  <p className="mt-1 text-xs text-slate-400">Save a billable EMR record first.</p>
+                </div>
               ) : (
-                visibleInvoices.map((invoice) => {
-                  const total = invoiceTotal(invoice);
-                  const paid = invoicePaid(invoice);
-                  const outstanding = Math.max(total - paid, 0);
-                  const isActive = invoice.id === (selectedInvoice?.id ?? "");
+                visibleInvoices.map((inv) => {
+                  const total = invoiceTotal(inv);
+                  const paid  = invoicePaid(inv);
+                  const outs  = Math.max(total - paid, 0);
+                  const isActive = inv.id === (selectedInvoice?.id ?? "");
 
                   return (
                     <button
-                      key={invoice.id}
+                      key={inv.id}
                       type="button"
-                      onClick={() => setSelectedInvoiceId(invoice.id)}
-                      className={`w-full rounded-3xl border p-4 text-left transition ${
-                        isActive
-                          ? "border-sky-300 bg-sky-50 shadow-[0_12px_28px_rgba(14,165,233,0.10)]"
-                          : "border-slate-200 bg-slate-50 hover:bg-white"
-                      }`}
+                      onClick={() => setSelectedInvoiceId(inv.id)}
+                      className={`w-full px-5 py-4 text-left transition ${isActive ? "bg-sky-50" : "hover:bg-slate-50"}`}
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="font-semibold text-slate-900">{invoice.invoiceNumber}</p>
-                          <p className="mt-1 text-sm text-slate-500">
-                            {invoice.patientName} | {formatDateLabel(invoice.issueDate)}
-                          </p>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-slate-900">{inv.invoiceNumber}</p>
+                          <p className="mt-0.5 truncate text-xs text-slate-500">{inv.patientName}</p>
+                          <p className="text-xs text-slate-400">{fmtDate(inv.issueDate)}</p>
                         </div>
-                        <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
-                          {outstanding === 0 ? "Paid" : "Outstanding"}
+                        <span className={`shrink-0 rounded-lg px-2 py-0.5 text-[10px] font-bold ${outs === 0 ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                          {outs === 0 ? "Paid" : "Outstanding"}
                         </span>
                       </div>
-                      <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
-                        <div className="rounded-2xl bg-white p-3 ring-1 ring-slate-200">
+                      <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                        <div className="rounded-lg bg-slate-100 px-2 py-1.5">
                           <p className="text-slate-500">Total</p>
-                          <p className="mt-1 font-semibold text-slate-900">{currency(total)}</p>
+                          <p className="mt-0.5 font-bold text-slate-900">{usd(total)}</p>
                         </div>
-                        <div className="rounded-2xl bg-white p-3 ring-1 ring-slate-200">
+                        <div className="rounded-lg bg-emerald-50 px-2 py-1.5">
                           <p className="text-slate-500">Paid</p>
-                          <p className="mt-1 font-semibold text-emerald-700">{currency(paid)}</p>
+                          <p className="mt-0.5 font-bold text-emerald-700">{usd(paid)}</p>
                         </div>
-                        <div className="rounded-2xl bg-white p-3 ring-1 ring-slate-200">
+                        <div className="rounded-lg bg-rose-50 px-2 py-1.5">
                           <p className="text-slate-500">Balance</p>
-                          <p className="mt-1 font-semibold text-rose-700">
-                            {currency(outstanding)}
-                          </p>
+                          <p className="mt-0.5 font-bold text-rose-700">{usd(outs)}</p>
                         </div>
                       </div>
                     </button>
@@ -443,234 +252,170 @@ export default function BillingPage() {
                 })
               )}
             </div>
-          </section>
+          </div>
 
-          <div className="space-y-6">
-            <section className="rounded-[28px] border border-white/80 bg-white/85 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-                <div>
-                  <h3 className="text-xl font-semibold text-slate-950">Invoice Detail</h3>
-                  <p className="mt-1 text-sm text-slate-500">
-                    Charges come from the treatment catalog and billable tooth entries in EMR.
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">
-                    {autoGeneratedInvoices.length} auto-generated
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => window.print()}
-                    disabled={!selectedInvoice}
-                    className="rounded-full bg-slate-950 px-4 py-2 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-                  >
-                    Print PDF
-                  </button>
-                </div>
+          {/* Right column */}
+          <div className="space-y-5">
+
+            {/* Invoice detail */}
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="border-b border-slate-100 px-5 py-4">
+                <h2 className="text-base font-bold text-slate-900">Invoice Detail</h2>
+                <p className="mt-0.5 text-xs text-slate-500">Charges from EMR treatment catalog.</p>
               </div>
 
               {!selectedInvoice ? (
-                <p className="mt-4 rounded-2xl bg-slate-100 p-4 text-sm text-slate-600">
-                  Select an invoice to review charges and record payment.
-                </p>
+                <div className="px-5 py-10 text-center">
+                  <p className="text-sm text-slate-400">Select an invoice to view charges.</p>
+                </div>
               ) : (
-                <div className="mt-5 space-y-5">
-                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                    <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-100">
-                      <p className="text-sm text-slate-500">Patient</p>
-                      <p className="mt-1 font-semibold text-slate-950">
-                        {selectedInvoice.patientName}
-                      </p>
-                    </div>
-                    <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-100">
-                      <p className="text-sm text-slate-500">Visit Date</p>
-                      <p className="mt-1 font-semibold text-slate-950">
-                        {formatDateLabel(selectedInvoice.issueDate)}
-                      </p>
-                    </div>
-                    <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-100">
-                      <p className="text-sm text-slate-500">Linked EMR</p>
-                      <p className="mt-1 font-semibold text-slate-950">
-                        {selectedInvoice.linkedRecordId || "Not linked"}
-                      </p>
-                    </div>
-                    <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-100">
-                      <p className="text-sm text-slate-500">Invoice Type</p>
-                      <p className="mt-1 font-semibold text-slate-950">
-                        {selectedInvoice.autoGenerated ? "Auto-generated" : "Manual"}
-                      </p>
+                <div className="p-5 space-y-5">
+                  {/* Meta */}
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    {[
+                      ["Patient", selectedInvoice.patientName],
+                      ["Visit Date", fmtDate(selectedInvoice.issueDate)],
+                      ["Linked EMR", selectedInvoice.linkedRecordId || "Not linked"],
+                      ["Type", selectedInvoice.autoGenerated ? "Auto-generated" : "Manual"],
+                    ].map(([k, v]) => (
+                      <div key={k} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">{k}</p>
+                        <p className="mt-1 text-sm font-semibold text-slate-900">{v}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Line items table */}
+                  <div>
+                    <p className={lbl}>Treatment Charges</p>
+                    <div className="overflow-hidden rounded-xl border border-slate-200">
+                      <table className="w-full border-collapse text-sm">
+                        <thead>
+                          <tr className="bg-slate-50 text-left">
+                            <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-widest text-slate-500">Treatment</th>
+                            <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-widest text-slate-500">Teeth</th>
+                            <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-widest text-slate-500">Qty</th>
+                            <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-widest text-slate-500">Unit</th>
+                            <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-widest text-slate-500">Amount</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {selectedInvoice.lineItems.length === 0 ? (
+                            <tr><td colSpan={5} className="px-4 py-6 text-center text-sm text-slate-400">No billable treatments yet.</td></tr>
+                          ) : (
+                            selectedInvoice.lineItems.map((item, i) => (
+                              <tr key={`${item.treatmentId}-${i}`} className="hover:bg-slate-50">
+                                <td className="px-4 py-3 font-medium text-slate-900">{item.treatment}</td>
+                                <td className="px-4 py-3 text-slate-500">{item.toothNumbers.length > 0 ? item.toothNumbers.join(", ") : "Case level"}</td>
+                                <td className="px-4 py-3 text-right text-slate-600">{item.quantity}</td>
+                                <td className="px-4 py-3 text-right text-slate-600">{usd(item.unitPrice)}</td>
+                                <td className="px-4 py-3 text-right font-semibold text-slate-900">{usd(item.quantity * item.unitPrice)}</td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
 
-                  <div className="rounded-3xl bg-slate-50 p-4">
-                    <h4 className="text-base font-semibold text-slate-950">Treatment Charges</h4>
-                    <div className="mt-4 space-y-3">
-                      {selectedInvoice.lineItems.length === 0 ? (
-                        <p className="rounded-2xl bg-white p-4 text-sm text-slate-600 ring-1 ring-slate-200">
-                          No billable treatments have been selected for this visit yet.
-                        </p>
-                      ) : (
-                        selectedInvoice.lineItems.map((item, index) => (
-                          <article
-                            key={`${item.treatmentId}-${index}`}
-                            className="rounded-2xl bg-white p-4 ring-1 ring-slate-200"
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div>
-                                <p className="font-medium text-slate-900">{item.treatment}</p>
-                                <p className="mt-1 text-sm text-slate-500">
-                                  {item.quantity} x {currency(item.unitPrice)} | {item.pricingModel}
-                                </p>
-                                <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500">
-                                  Teeth:{" "}
-                                  {item.toothNumbers.length > 0
-                                    ? item.toothNumbers.join(", ")
-                                    : "Case level"}
-                                </p>
-                              </div>
-                              <span className="font-semibold text-slate-900">
-                                {currency(item.quantity * item.unitPrice)}
-                              </span>
-                            </div>
-                          </article>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid gap-3 md:grid-cols-3">
-                    <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-100">
-                      <p className="text-sm text-slate-500">Invoice Total</p>
-                      <p className="mt-1 text-2xl font-semibold text-slate-950">
-                        {currency(selectedInvoiceTotal)}
-                      </p>
-                    </div>
-                    <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-100">
-                      <p className="text-sm text-slate-500">Paid</p>
-                      <p className="mt-1 text-2xl font-semibold text-emerald-700">
-                        {currency(selectedInvoicePaid)}
-                      </p>
-                    </div>
-                    <div className="rounded-2xl bg-slate-950 p-4 text-white">
-                      <p className="text-sm text-slate-300">Outstanding Balance</p>
-                      <p className="mt-1 text-2xl font-semibold">
-                        {currency(selectedInvoiceOutstanding)}
-                      </p>
+                  {/* Totals */}
+                  <div className="ml-auto grid w-full max-w-xs gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm">
+                    <div className="flex justify-between"><span className="text-slate-500">Invoice Total</span><span className="font-semibold text-slate-900">{usd(selTotal)}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-500">Paid</span><span className="font-semibold text-emerald-700">{usd(selPaid)}</span></div>
+                    <div className="flex justify-between border-t border-slate-200 pt-2">
+                      <span className="font-bold text-slate-900">Outstanding</span>
+                      <span className={`font-bold ${selOuts > 0 ? "text-rose-700" : "text-emerald-700"}`}>{usd(selOuts)}</span>
                     </div>
                   </div>
                 </div>
               )}
-            </section>
+            </div>
 
-            <section className="rounded-[28px] border border-white/80 bg-white/85 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
-              <div>
-                <h3 className="text-xl font-semibold text-slate-950">Record Payment</h3>
-                <p className="mt-1 text-sm text-slate-500">
-                  Payment remains manual even though invoice charges are automatic.
-                </p>
+            {/* Record Payment */}
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="border-b border-slate-100 px-5 py-4">
+                <h2 className="text-base font-bold text-slate-900">Record Payment</h2>
+                <p className="mt-0.5 text-xs text-slate-500">Payments are always entered manually.</p>
               </div>
 
               {!selectedInvoice ? (
-                <p className="mt-4 rounded-2xl bg-slate-100 p-4 text-sm text-slate-600">
-                  Select an invoice first.
-                </p>
-              ) : (
-                <form className="mt-6 space-y-6" onSubmit={handlePaymentSubmit}>
-                  <div className="grid gap-4 md:grid-cols-4">
-                    <label className="space-y-1">
-                      <span className="text-sm font-medium text-slate-700">Amount</span>
-                      <input
-                        type="number"
-                        min="0"
-                        name="amount"
-                        value={paymentForm.amount}
-                        onChange={handlePaymentFieldChange}
-                        placeholder={selectedInvoiceOutstanding.toString()}
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white"
-                      />
-                    </label>
-                    <label className="space-y-1">
-                      <span className="text-sm font-medium text-slate-700">Method</span>
-                      <select
-                        name="method"
-                        value={paymentForm.method}
-                        onChange={handlePaymentFieldChange}
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white"
-                      >
-                        {paymentMethodOptions.map((method) => (
-                          <option key={method} value={method}>
-                            {method}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="space-y-1">
-                      <span className="text-sm font-medium text-slate-700">Paid At</span>
-                      <input
-                        type="date"
-                        name="paidAt"
-                        value={paymentForm.paidAt}
-                        onChange={handlePaymentFieldChange}
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white"
-                      />
-                    </label>
-                    <label className="space-y-1">
-                      <span className="text-sm font-medium text-slate-700">Reference</span>
-                      <input
-                        name="reference"
-                        value={paymentForm.reference}
-                        onChange={handlePaymentFieldChange}
-                        placeholder="Receipt / txn ref"
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-sky-400 focus:bg-white"
-                      />
-                    </label>
+                <p className="px-5 py-8 text-center text-sm text-slate-400">Select an invoice first.</p>
+              ) : selOuts === 0 ? (
+                <div className="flex items-center gap-3 px-5 py-5">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-4 w-4 text-emerald-600"><path d="M3 8l3 3 7-7"/></svg>
                   </div>
-
-                  <button
-                    type="submit"
-                    disabled={isSaving || selectedInvoiceOutstanding === 0}
-                    className="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-                  >
-                    {isSaving ? "Recording Payment..." : "Record Payment"}
+                  <div>
+                    <p className="text-sm font-semibold text-emerald-700">Fully paid</p>
+                    <p className="text-xs text-slate-400">No outstanding balance on this invoice.</p>
+                  </div>
+                </div>
+              ) : (
+                <form onSubmit={handlePaymentSubmit} className="p-5 space-y-4">
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <div>
+                      <label className={lbl}>Amount</label>
+                      <input type="number" min="0" step="0.01" name="amount" value={paymentForm.amount || ""} onChange={handlePaymentChange} placeholder={selOuts.toFixed(2)} className={input} />
+                    </div>
+                    <div>
+                      <label className={lbl}>Method</label>
+                      <select name="method" value={paymentForm.method} onChange={handlePaymentChange} className={input}>
+                        {paymentMethodOptions.map((m) => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className={lbl}>Date Paid</label>
+                      <input type="date" name="paidAt" value={paymentForm.paidAt} onChange={handlePaymentChange} className={input} />
+                    </div>
+                    <div>
+                      <label className={lbl}>Reference</label>
+                      <input name="reference" value={paymentForm.reference} onChange={handlePaymentChange} placeholder="Txn / receipt ref" className={input} />
+                    </div>
+                  </div>
+                  <button type="submit" disabled={isSaving || !paymentForm.amount || !paymentForm.paidAt}
+                    className="flex items-center gap-2 rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50">
+                    {isSaving ? (
+                      <><svg className="h-4 w-4 animate-spin" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="8" cy="8" r="6" strokeOpacity=".3"/><path d="M14 8a6 6 0 0 0-6-6" strokeLinecap="round"/></svg>Recording…</>
+                    ) : "Record Payment"}
                   </button>
                 </form>
               )}
-            </section>
+            </div>
 
-            <section className="rounded-[28px] border border-white/80 bg-slate-950 p-6 text-white shadow-[0_20px_50px_rgba(15,23,42,0.16)]">
-              <p className="text-xs uppercase tracking-[0.28em] text-cyan-200/75">
-                Payment History
-              </p>
-              <h3 className="mt-2 text-xl font-semibold">Recorded Transactions</h3>
-              <div className="mt-4 space-y-3">
-                {!selectedInvoice || selectedInvoice.payments.length === 0 ? (
-                  <p className="rounded-2xl bg-white/10 p-4 text-sm text-slate-300">
-                    No payments recorded for the selected invoice.
-                  </p>
-                ) : (
-                  selectedInvoice.payments.map((payment, index) => (
-                    <article
-                      key={`${payment.method}-${payment.paidAt}-${index}`}
-                      className="rounded-2xl border border-white/10 bg-white/6 p-4"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="font-medium text-white">{currency(payment.amount)}</p>
-                          <p className="mt-1 text-sm text-slate-300">
-                            {payment.method} | {formatDateLabel(payment.paidAt)}
-                          </p>
-                        </div>
-                        <span className="text-sm text-slate-300">
-                          {payment.reference || "No reference"}
-                        </span>
-                      </div>
-                    </article>
-                  ))
-                )}
+            {/* Payment history */}
+            {selectedInvoice && selectedInvoice.payments.length > 0 && (
+              <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div className="border-b border-slate-100 px-5 py-4">
+                  <h2 className="text-base font-bold text-slate-900">Payment History</h2>
+                </div>
+                <div className="overflow-hidden rounded-b-2xl">
+                  <table className="w-full border-collapse text-sm">
+                    <thead>
+                      <tr className="bg-slate-50 text-left">
+                        <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-widest text-slate-500">Date</th>
+                        <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-widest text-slate-500">Method</th>
+                        <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-widest text-slate-500">Reference</th>
+                        <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-widest text-slate-500">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {selectedInvoice.payments.map((p, i) => (
+                        <tr key={`${p.method}-${p.paidAt}-${i}`} className="hover:bg-slate-50">
+                          <td className="px-5 py-3 text-slate-700">{fmtDate(p.paidAt)}</td>
+                          <td className="px-5 py-3 capitalize text-slate-700">{p.method}</td>
+                          <td className="px-5 py-3 text-slate-500">{p.reference || "—"}</td>
+                          <td className="px-5 py-3 text-right font-semibold text-emerald-700">{usd(p.amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </section>
+            )}
+
           </div>
         </div>
+
       </div>
     </AdminShell>
   );
